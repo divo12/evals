@@ -14,4 +14,4 @@ harbor run -p tasks/fanout-audit/control -a oracle -e docker -n 1 -y
 harbor run -p tasks/fanout-audit/treatment --env-file .env -e docker -n 1 -y
 ```
 
-Smoke is 16 routes / 4 planted (`ROUTE_COUNT=16`, `PLANTED=4`). Treatment needs Trigger keys and `ANTHROPIC_API_KEY`.
+Smoke is 16 routes / 4 planted (`ROUTE_COUNT=16`, `PLANTED=4`). Treatment needs Trigger keys and Azure OpenAI (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, `AZURE_OPENAI_DEPLOYMENT`).

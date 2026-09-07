@@ -76,7 +76,8 @@ Do not store planted route lists or degrade-service names here.
   trigger API. Never set `TRIGGER_ACCESS_TOKEN` from the project secret — the
   CLI then refuses to start and Cloud runs sit in `PENDING_VERSION`.
 - Also pass `TRIGGER_PROJECT_REF`. Fan-out children that call a model also
-  need `ANTHROPIC_API_KEY` on the sidecar.
+  need `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, and
+  `AZURE_OPENAI_DEPLOYMENT` on the sidecar.
 
 ## Verification guidance
 

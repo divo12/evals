@@ -16,9 +16,30 @@ Do not run `trigger deploy`.
 /app/orchestrator/src/trigger/*.ts      # your tasks
 ```
 
-`TRIGGER_SECRET_KEY`, `TRIGGER_ACCESS_TOKEN`, `TRIGGER_PROJECT_REF`, and
-`ANTHROPIC_API_KEY` are in the environment. The worker is already authenticated;
-do not run `login`, `dev`, or `deploy`.
+`TRIGGER_SECRET_KEY`, `TRIGGER_ACCESS_TOKEN`, `TRIGGER_PROJECT_REF`,
+`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, and `AZURE_OPENAI_DEPLOYMENT`
+are in the environment. The worker is already authenticated; do not run
+`login`, `dev`, or `deploy`.
+
+Call the model from inside a Trigger task the way Trigger.dev documents: Vercel
+AI SDK `generateText` (or `AgentChat`) plus `@ai-sdk/azure`. Do not wrap Azure
+in a custom HTTP helper.
+
+```ts
+import { generateText } from "ai";
+import { createAzure } from "@ai-sdk/azure";
+
+const azure = createAzure({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  baseURL: process.env.AZURE_OPENAI_BASE_URL,
+});
+
+await generateText({
+  model: azure.chat(process.env.AZURE_OPENAI_DEPLOYMENT!),
+  prompt: "...",
+  experimental_telemetry: { isEnabled: true },
+});
+```
 
 Write a parent task that lists the route files, then fans out with
 `batchTriggerAndWait` (or `pipeline`-equivalent child triggers). Each child

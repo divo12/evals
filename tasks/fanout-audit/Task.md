@@ -30,7 +30,7 @@ Two Harbor packages, one tracker, one planted set:
 - Later user turns or event input, if any: none.
 - Context supplied outside the instruction:
   - Both: generated `/app` API repo; `TRACKER_URL=http://tracker:9410`; `CI_SECONDS`.
-  - Treatment only: seeded `/app/orchestrator`; `TRIGGER_SECRET_KEY`, `TRIGGER_PROJECT_REF`, `ANTHROPIC_API_KEY`.
+  - Treatment only: seeded `/app/orchestrator`; Trigger keys; `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, `AZURE_OPENAI_DEPLOYMENT`.
 
 ## Relevant agent conditions
 
@@ -38,7 +38,7 @@ Two Harbor packages, one tracker, one planted set:
 - Treatment: author parent + child tasks, trigger once, idle until done. Harbor grades when the agent exits.
 - Tools: filesystem under `/app`; `POST $TRACKER_URL/tickets`; `./scripts/ci.sh`. Treatment also uses the sidecar worker and a model API from child runs.
 - Material differences: smoke is 16 routes / 4 planted. Raise `ROUTE_COUNT` / `PLANTED` and `[agent].timeout_sec` for a larger fan-out.
-- Credentials: none on control. Treatment needs Trigger keys and `ANTHROPIC_API_KEY`. `VERIFIER_TOKEN` is verifier-only.
+- Credentials: none on control. Treatment needs Trigger keys and Azure OpenAI (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, `AZURE_OPENAI_DEPLOYMENT`). `VERIFIER_TOKEN` is verifier-only.
 
 ## Environment
 
@@ -85,5 +85,5 @@ Treatment only (`grade.mjs --require-trigger`):
 
 - Human decisions: Draft. End-to-end build requested after design approval.
 - Run plan: `harbor run -p tasks/fanout-audit/control -a oracle -e docker -n 1`. Treatment: `harbor run -p tasks/fanout-audit/treatment -a oracle --env-file .env -e docker -n 1`. Control Oracle passed (`jobs/2026-09-07__23-24-47`). Model trials not authorized.
-- Assumptions: Harbor grades when the agent exits; child tasks can read `/app` via the shared volume; `ANTHROPIC_API_KEY` is how children call the model.
+- Assumptions: Harbor grades when the agent exits; child tasks can read `/app` via the shared volume; children call Azure OpenAI with the injected deployment.
 - Remaining questions: verify `triggerRunId` against Cloud instead of prefix; whether default Harbor agent is Claude Code with the Workflow tool (control arm A) or only Task-tool subagents (arm D).

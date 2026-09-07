@@ -1,4 +1,4 @@
-import { task } from "@trigger.dev/sdk";
+import { task, wait } from "@trigger.dev/sdk";
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -16,17 +16,17 @@ export const fanoutAudit = task({
       .filter((f) => f.endsWith(".ts"))
       .map((f) => f.replace(/\.ts$/, ""));
 
-    const payloads = files.map((route) => ({ payload: { route } }));
-    let batch = await auditRoute.batchTriggerAndWait(payloads);
-
+    // Sequential children: trigger dev often loses executors on a 16-way batch.
     const findings: { confirmed: boolean; route: string; reason: string; runId: string }[] = [];
-    for (let i = 0; i < batch.runs.length; i++) {
-      let run = batch.runs[i];
-      if (!run.ok) {
-        run = await auditRoute.triggerAndWait(payloads[i].payload);
+    for (const route of files) {
+      let run: Awaited<ReturnType<typeof auditRoute.triggerAndWait>> | undefined;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        run = await auditRoute.triggerAndWait({ route });
+        if (run.ok) break;
+        await wait.for({ seconds: 8 });
       }
-      if (!run.ok) {
-        throw new Error(`child failed ${files[i]} ${JSON.stringify(run.error ?? run)}`);
+      if (!run?.ok) {
+        throw new Error(`child failed ${route} ${JSON.stringify(run?.error ?? run)}`);
       }
       findings.push({
         confirmed: run.output.confirmed,

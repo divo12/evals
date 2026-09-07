@@ -26,7 +26,7 @@ Each Harbor package has `instruction.md`, `environment/`, and `tests/test.sh` (w
 harbor run -p tasks/release-train/control -a oracle -e docker -n 1 -y
 harbor run -p tasks/release-train/treatment -a oracle --env-file .env -e docker -n 1 -y
 harbor run -p tasks/fanout-audit/control -a oracle -e docker -n 1 -y
-# fanout-audit treatment Oracle needs a Console ANTHROPIC_API_KEY in .env
+# fanout-audit treatment Oracle needs Azure OpenAI vars in .env
 ```
 
 `release-train` defaults to `PROFILE=smoke` (~5–15 minutes). For the product comparison, set `PROFILE=compressed` and raise the agent timeout.
