@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trigger.dev Benchmark Proposal — Four Scenarios</title>
+<style>
+  :root {
+    --ink: #1a1a1a; --muted: #5c5c5c; --line: #e3e3e3; --bg: #ffffff; --soft: #f6f6f4;
+    --accent: #0b5cad; --ok: #1f7a3d; --warn: #9a5b00; --bad: #a12626;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.55; font-size: 16px; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 26px; margin: 56px 0 12px; padding-top: 24px; border-top: 2px solid var(--ink); }
+  h3 { font-size: 19px; margin: 28px 0 8px; }
+  h4 { font-size: 16px; margin: 20px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+  p { margin: 8px 0 12px; }
+  .sub { color: var(--muted); font-size: 17px; margin-bottom: 24px; }
+  .pitch { background: var(--soft); border-left: 4px solid var(--accent); padding: 14px 18px; margin: 16px 0 20px; font-size: 17px; }
+  .pitch b { color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 14px 0; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: #fff; }
+  .card h5 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 14.5px; color: #333; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  td.k { font-weight: 600; white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+  ul, ol { margin: 6px 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: 6px; }
+  .tag.p1 { border-color: var(--ok); color: var(--ok); }
+  .tag.p2 { border-color: var(--warn); color: var(--warn); }
+  .tag.p3 { border-color: var(--muted); }
+  .note { border: 1px dashed var(--line); padding: 12px 16px; border-radius: 8px; margin: 14px 0; font-size: 15px; background: #fcfcfb; }
+  .note b { color: var(--bad); }
+  .toc { background: var(--soft); padding: 16px 22px; border-radius: 8px; margin: 20px 0 10px; }
+  .toc ol { margin: 6px 0 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .small { font-size: 14px; color: var(--muted); }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 18px; }
+  .flow span { background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+  .flow .arr { border: none; background: none; color: var(--muted); padding: 0 2px; }
+  a { color: var(--accent); }
+  .kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
+  .kpi div { background: var(--soft); border-radius: 8px; padding: 12px 14px; }
+  .kpi b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .kpi span { font-size: 14px; color: #333; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Trigger.dev Benchmark Proposal</h1>
+<p class="sub">Four evaluation scenarios for durable execution and durable agents. Written to be explained in a meeting, with enough detail underneath to build from.</p>
+
+<div class="toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#big">The big picture: what we are measuring and why nobody has</a></li>
+    <li><a href="#s1">Scenario 1 — Durable workflows: Trigger.dev vs Temporal (plus the "LLM as author" axis)</a></li>
+    <li><a href="#s2">Scenario 2 — Long-running coding agents on a durable substrate</a></li>
+    <li><a href="#s3">Scenario 3 — Scheduler and reliability bench</a></li>
+    <li><a href="#s4">Scenario 4 — chat.agent bench, built by extending τ²-bench</a></li>
+    <li><a href="#s5">Scenario 5 — Dynamic workflows written by Claude vs Trigger.dev workflows written by Claude</a></li>
+    <li><a href="#cred">Making it credible: shared harness, controls, and quality checks</a></li>
+    <li><a href="#plan">Priorities, effort, and open questions for Trigger</a></li>
+    <li><a href="#gloss">Glossary and references</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="big">1. The big picture</h2>
+
+<div class="pitch">
+<b>The one-sentence version.</b> Every durable-execution vendor claims "your code survives crashes, restarts, and deploys." Nobody has ever published a measurement of that claim under injected faults, across vendors, with a checker that can prove a violation. We propose to build that measurement, and to extend it to the two things people now run on these platforms: long-running coding agents and durable chat agents.
+</div>
+
+<h3>What "durable" has to mean, in four sentences</h3>
+<p>Whatever is running, whatever breaks underneath it, four things must hold. Every scenario below is a way of testing one or more of these under a specific kind of failure.</p>
+<div class="grid">
+  <div class="card"><h5>1. Correct terminal state</h5><p>The job finishes and the result is right. For a workflow: the database ends up in the expected state. For an agent: the hidden tests pass.</p></div>
+  <div class="card"><h5>2. Every effect exactly once</h5><p>No lost work, no duplicated work. An email is sent once. A refund is issued once. A commit is pushed once. Measured from a ledger, not from logs.</p></div>
+  <div class="card"><h5>3. Beliefs match reality</h5><p>After any recovery, what the program (or agent) "remembers" agrees with what actually happened. No stale reads, no branch taken on old data, no "I already installed that" when it didn't.</p></div>
+  <div class="card"><h5>4. Compute only while working</h5><p>Waiting for a human, a CI run, or a rate-limit backoff should cost nothing. Measured as billed compute-seconds divided by wall-clock wait time.</p></div>
+</div>
+
+<h3>Why this doesn't exist yet</h3>
+<ul>
+  <li><b>Vendor benchmarks</b> (Restate, DBOS) measure latency of trivial N-step workflows with no faults. They are run by the vendor.</li>
+  <li><b>Vendor chaos guides</b> (Temporal's pre-production testing doc) tell customers how to inject faults but publish no results.</li>
+  <li><b>Agent benchmarks</b> (SWE-bench, τ-bench, MettleBench) measure the model, on infrastructure that is assumed to be perfect.</li>
+  <li><b>Distributed-systems testing</b> (Jepsen, deterministic simulation) has the rigour but has never been pointed at workflow engines or agents.</li>
+</ul>
+<p>We sit at the intersection: agent-realistic workloads, seeded fault injection, and a Jepsen-style ledger and checker that turns "it seemed fine" into "here is a history no correct system could produce."</p>
+
+<h3>The shared harness</h3>
+<p>All four scenarios reuse one set of parts. Build it once.</p>
+<div class="flow">
+  <span>Workload spec</span><span class="arr">→</span>
+  <span>Implementation under test (per platform)</span><span class="arr">→</span>
+  <span>Fake external services with ledgers</span><span class="arr">→</span>
+  <span>Seeded fault injector</span><span class="arr">→</span>
+  <span>Checker (invariants + task oracle)</span><span class="arr">→</span>
+  <span>Report</span>
+</div>
+<ul>
+  <li><b>Fake external services</b>: vendor APIs, payment processor, CI, email, approver. Each records every call with its idempotency key, timestamp and result. This is the source of truth for "exactly once."</li>
+  <li><b>Seeded fault injector</b>: a schedule that says what breaks and when, expressed in trajectory positions ("after the 3rd tool call") not wall-clock, so the same schedule means the same thing on every platform. Same seed, same faults, every arm.</li>
+  <li><b>Checker</b>: reads the ledger and the platform's own records and checks the four invariants, plus the scenario's task oracle (DB hash, hidden tests, transcript comparison).</li>
+</ul>
+
+<h3>Scenarios at a glance</h3>
+<table>
+  <tr><th>#</th><th>Scenario</th><th>Question it answers</th><th>What is fixed</th><th>What varies</th><th>Priority</th></tr>
+  <tr><td class="k">1</td><td>Durable workflows</td><td>Given a heavy long-running workflow, how does Trigger.dev hold up against Temporal under faults? And can LLMs build one correctly on each?</td><td>The workload spec and fault schedule</td><td>Platform, and who wrote the code (expert vs LLM)</td><td><span class="tag p1">First</span></td></tr>
+  <tr><td class="k">2</td><td>Long-running coding agents</td><td>Does running a 4–12 hour coding agent on durable infrastructure actually help, or is it just restarts?</td><td>The agent harness, model and task</td><td>The substrate underneath the agent</td><td><span class="tag p2">Second</span></td></tr>
+  <tr><td class="k">3</td><td>Scheduler bench</td><td>How fast, fair and exact is the scheduler under load? Cron drift, concurrency limits, priority.</td><td>Trivial task bodies</td><td>Platform, load level</td><td><span class="tag p3">By-product</span></td></tr>
+  <tr><td class="k">4</td><td>chat.agent bench</td><td>Do durable chat sessions keep their promises (no lost or duplicated messages, resumable streams, free waiting) under faults?</td><td>τ²-bench tasks, policy and user simulator</td><td>Chat substrate (chat.agent vs hand-rolled vs Vercel)</td><td><span class="tag p1">First</span></td></tr>
+  <tr><td class="k">5</td><td>Dynamic workflows vs Trigger.dev workflows</td><td>When Claude writes the orchestration itself, is a runtime-generated script (Claude Code dynamic workflow) or a Trigger.dev task the better home for it? Speed, cost, and what survives a crash.</td><td>The task, the model, the fault schedule</td><td>Where the Claude-written workflow runs</td><td><span class="tag p2">Second</span></td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s1">2. Scenario 1 — Durable workflows</h2>
+
+<div class="pitch">
+<b>Pitch.</b> Take one realistic, hours-long background workflow. Build it on Trigger.dev and on Temporal. Break things underneath it in fifteen specific ways, on a fixed schedule. Score both on four parameters. Then repeat with an LLM writing the code instead of us, to answer Trigger's second question: can models build durable products, with and without Trigger.dev?
+</div>
+
+<h3>Why this workload: lead generation</h3>
+<p>We studied a real Temporal project (an intent engine that runs lead-generation "plays"). It uses Temporal for exactly the reasons a benchmark wants to test: per-vendor rate limits, activity-level retries with different policies per vendor, fan-out into hundreds of child workflows, schedules with overlap policies, workflow-ID idempotency, and observability over long runs. It is a DAG of vendor calls (job boards, enrichment APIs, LLM scoring) that must run for hours without duplicating outreach or losing leads.</p>
+<div class="grid">
+  <div class="card"><h5>Shape</h5><p>N plays × M strategies. Each strategy is a DAG: search → dedupe → enrich → score → deliver. Fan-out per level into hundreds of items. Total run: 2–8 hours.</p></div>
+  <div class="card"><h5>Fake vendors</h5><p>Every vendor is a local mock API with configurable rate limits, latency, error rates and a ledger. So faults are exact and repeatable, and duplicates are countable.</p></div>
+  <div class="card"><h5>Waits</h5><p>Includes a human approval before "deliver" and a scheduled re-run every hour, so waiting and scheduling are part of the workload, not an afterthought.</p></div>
+</div>
+
+<h3>Arms</h3>
+<ul>
+  <li><b>Trigger.dev</b>, self-hosted (Docker) for the local fault work; cloud for the two parameters that need checkpoints (see note).</li>
+  <li><b>Temporal</b>, self-hosted, same machines.</li>
+  <li>Optional later: Inngest, Restate, Vercel Workflows. Two vendors is a duel; four is a benchmark.</li>
+</ul>
+<div class="note"><b>Important limit.</b> Self-hosted Trigger.dev has no checkpoint/suspend support (that is cloud-only). So Durability and Recovery are fully testable locally; State Persistence across suspends and Resource Efficiency during waits must be measured against Trigger Cloud as a black box. This is a two-tier design, and it should be stated openly in the report.</div>
+
+<h3>The four parameters</h3>
+<table>
+  <tr><th>Parameter</th><th>Plain-English meaning</th><th>How we measure it</th></tr>
+  <tr><td class="k">Durability</td><td>Did it finish correctly, with every effect exactly once?</td><td>Terminal DB state matches gold. Ledger: duplicate count (same idempotency key executed twice) and gap count (an effect that should exist and doesn't). Reported as pass^k: all k trials must pass.</td></tr>
+  <tr><td class="k">Recovery</td><td>After a failure, how long until it is working again, and how much finished work did it redo?</td><td>RTO: time from fault to the first resumed instruction (from ledger timestamps). Redone work: count of already-completed steps executed again after the fault.</td></tr>
+  <tr><td class="k">State Persistence</td><td>Does the workflow's memory survive waits and restarts?</td><td>A "canary" (a random value written into local state at the start) must be intact after every wait/resume. Branch decisions must match fresh data (no stale reads). Tested at each wait boundary.</td></tr>
+  <tr><td class="k">Resource Efficiency</td><td>Does waiting cost money or hold a worker slot?</td><td>Compute-seconds billed and slots held during waits and backoff, divided by the wall-clock time of those waits. Ideal is near zero.</td></tr>
+</table>
+
+<h3>The fifteen faults</h3>
+<p>Grouped by where they hit. Each is one line in the seeded schedule.</p>
+<table>
+  <tr><th>Where</th><th>Fault</th><th>What it tests</th></tr>
+  <tr><td rowspan="6" class="k">Vendor / dependency</td><td>Rate limiting (429), with and without Retry-After</td><td>Backoff behaviour; whether platform throttling prevents it in the first place</td></tr>
+  <tr><td>Transient 5xx burst</td><td>Retry classification; retries are bounded</td></tr>
+  <tr><td>Slow tail latency or hang (45s or never)</td><td>Activity timeouts; slot starvation</td></tr>
+  <tr><td>Timeout, then the call succeeds anyway</td><td>Duplicate side effects on retry (the classic)</td></tr>
+  <tr><td>Vendor hard-down for 15 minutes</td><td>Degrade-not-die: other DAG levels still run, node marked failed</td></tr>
+  <tr><td>Non-retryable 400/401/422</td><td>Fail fast, no retries</td></tr>
+  <tr><td rowspan="3" class="k">Worker / process</td><td>SIGKILL mid-activity</td><td>Recovery time; how much completed work is redone</td></tr>
+  <tr><td>OOM kill on a large fan-out</td><td>OOM handling: retry on bigger machine vs loop forever</td></tr>
+  <tr><td>All workers down, restart after 2 minutes</td><td>Recovery storm; backlog drain; missed schedules on return</td></tr>
+  <tr><td rowspan="2" class="k">Control plane</td><td>Orchestrator or its DB restarts for 60s</td><td>Do in-flight runs survive; do workers reconnect</td></tr>
+  <tr><td>Network partition worker ↔ control plane</td><td>Heartbeat loss; reassignment; double execution when the partitioned worker reconnects</td></tr>
+  <tr><td rowspan="2" class="k">Scheduling</td><td>Duplicate trigger of an already-running play</td><td>Idempotency / workflow-ID conflict handling</td></tr>
+  <tr><td>Schedule overrun (run longer than interval)</td><td>Overlap policy: skip vs buffer vs double-run</td></tr>
+  <tr><td class="k">Lifecycle</td><td>Deploy mid-run</td><td>Version pinning; Temporal-specific nondeterminism risk on replay</td></tr>
+  <tr><td class="k">Data</td><td>Poison item (one lead always throws)</td><td>Isolation: 999 others complete, one fails cleanly</td></tr>
+</table>
+
+<h3>The author axis (Trigger's goal 2)</h3>
+<p>Everything above assumes we write correct reference implementations. That measures the platform ceiling. Trigger also asked: <i>how good are LLMs at building durable products, with and without Trigger.dev?</i> That is the same experiment with the author swapped. So the result is one matrix:</p>
+<table>
+  <tr><th></th><th>Expert (us)</th><th>GPT / Claude, docs only</th><th>GPT / Claude, with Trigger skills + MCP</th></tr>
+  <tr><td class="k">Plain Node + Postgres + queue</td><td>Baseline ceiling</td><td>What LLMs do today</td><td>—</td></tr>
+  <tr><td class="k">Trigger.dev</td><td>Platform ceiling</td><td>Durability lift = this minus plain Node</td><td>Skills lift = this minus docs-only</td></tr>
+  <tr><td class="k">Temporal</td><td>Platform ceiling</td><td>"Determinism tax": how often LLM code breaks replay</td><td>—</td></tr>
+</table>
+<ul>
+  <li><b>Read across a row</b>: how learnable is this platform for LLMs (expert score minus LLM score).</li>
+  <li><b>Read down a column</b>: which platform holds up for a given author.</li>
+  <li><b>Every failing LLM project</b> is a misused API. Aggregated, that is a ranked footgun list with frequency per model: <code>wait.for</code> inside <code>Promise.all</code>, non-idempotent tools under OOM retry, state initialised in the wrong hook, two-step DB writes that race on refresh. Directly actionable for Trigger's docs and SDK.</li>
+</ul>
+
+<h3>What the output looks like</h3>
+<div class="kpi">
+  <div><b>Per platform × fault</b><span>pass^k, duplicate count, gap count, RTO p50/p95, redone-work %, canary survival, idle-cost ratio</span></div>
+  <div><b>Headline chart</b><span>pass^k against fault density for each platform, with the no-fault line to separate platform effects from noise</span></div>
+  <div><b>Author matrix</b><span>durability lift and skills lift per model; ranked footgun list</span></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s2">3. Scenario 2 — Long-running coding agents on a durable substrate</h2>
+
+<div class="pitch">
+<b>Pitch.</b> A lot of people now run coding agents for hours. Everyone assumes durable execution helps. Nobody has data. Run the same agent (Claude Agent SDK or pi) on the same 4–12 hour tasks, on a plain VM with a supervisor versus inside a Trigger.dev task, inject the same faults, and measure completion, lost work, rework, and whether the agent's memory still matches its files after a restart.
+</div>
+
+<h3>What is different about a coding agent</h3>
+<p>A workflow's progress lives in step results, which an engine can replay. A coding agent's progress lives in four places, and a substrate only protects some of them:</p>
+<div class="grid">
+  <div class="card"><h5>Transcript</h5><p>The model's context. Harnesses persist this already (session resume). Cheap to protect.</p></div>
+  <div class="card"><h5>Workspace</h5><p>The repo, installed dependencies, build artefacts, the dataset. On local disk. Dies with the container unless pushed or synced.</p></div>
+  <div class="card"><h5>In-flight processes</h5><p>A 20-minute test run, a dev server, a download. Never recoverable; must be redone.</p></div>
+  <div class="card"><h5>External effects</h5><p>PRs opened, commits pushed, API calls made. Survive everything, which is the danger: on resume the agent may do them again.</p></div>
+</div>
+<p>Trigger's durability is checkpoint-at-wait plus retry-as-new-attempt. For a crash mid-tool it gives a fresh container and a retry, not a magic resume. Whether that beats <code>systemctl restart</code> depends on what was externalised and how the harness resumes. That is the real question.</p>
+
+<h3>The five things that must hold</h3>
+<ol>
+  <li><b>The task finishes.</b> Hidden tests pass, within a wall-clock and dollar budget.</li>
+  <li><b>Work is not lost.</b> After any interruption, completed work survives and the agent continues from it.</li>
+  <li><b>Work is not redone or done twice.</b> No repeated tool calls, no duplicate commits, PRs, or API writes.</li>
+  <li><b>The agent's beliefs match reality.</b> Transcript and workspace agree after resume.</li>
+  <li><b>Compute is consumed only while working.</b> Not while waiting for CI, humans, or rate limits.</li>
+</ol>
+
+<h3>Three hypotheses to test (and be honest about)</h3>
+<ul>
+  <li><b>Waits.</b> Real coding tasks wait for hours: CI, approval, rate limits. A supervised VM bills for and risks the process during that wait; a checkpointing substrate doesn't. If tasks include waits, durable should win; if they don't, it might not.</li>
+  <li><b>Infrastructure loss.</b> Process crash is easy (disk survives). VM preemption, OOM-kill, host failure, harness deploy: disk is gone. Here "plain VM" collapses to restart-from-zero.</li>
+  <li><b>Desync.</b> After resume, the transcript says "I ran <code>npm install</code> and edited 14 files" but the workspace may disagree. How often does the agent notice before acting? Fine-grained durability should reduce this; coarse durability won't.</li>
+</ul>
+<p class="small">Expected honest result: for pure process crashes, supervisor + git + harness resume gets most of the way; durable execution earns its keep on waits, infrastructure loss and exactly-once effects. If that's what the data says, it is still a valuable paper and Trigger still wins on the cases that matter in production.</p>
+
+<h3>Arms (an ablation, not a two-way race)</h3>
+<table>
+  <tr><th>Arm</th><th>What it is</th><th>What it isolates</th></tr>
+  <tr><td class="k">Naive restart</td><td>Kill → start from the original prompt</td><td>Lower bound</td></tr>
+  <tr><td class="k">VM + supervisor</td><td>systemd restart, harness native resume, workspace on local disk. Two sub-variants: process kill (disk survives) and VM replacement (disk gone)</td><td>What most teams do today</td></tr>
+  <tr><td class="k">Trigger Level 1</td><td>Task with retries; transcript and workspace externalised at turn boundaries (git push, metadata)</td><td>"Persist state and restart"</td></tr>
+  <tr><td class="k">Trigger Level 2</td><td>Plus: long waits as <code>wait.for</code> / <code>wait.forToken</code>; expensive tools as idempotent subtasks; OOM retry on bigger machine</td><td>Real durable execution</td></tr>
+  <tr><td class="k">Aligned checkpoints</td><td>AgentRewind-style joint snapshots of context + filesystem (published state of the art)</td><td>Best known recovery technique</td></tr>
+  <tr><td class="k">microVM snapshot</td><td>Trigger's Firecracker runtime (private beta), whole-VM checkpoint including filesystem</td><td>Whether infra-level snapshots make Levels 1–2 unnecessary</td></tr>
+</table>
+<p>Same harness, model and prompts in every arm. The Level 1 vs Level 2 delta is the actual answer to "is it just restarts?"</p>
+
+<h3>Tasks: use MettleBench, add waits</h3>
+<p><a href="https://github.com/Kelvin-Coffee/MettleBench">MettleBench</a> (Aug 2026, Apache 2.0) is 82 long-horizon engineering tasks derived from Terminal-Bench 2.0, ProgramBench, SWE-bench, ProjectEval and GitTaskBench. Each task has a hidden, ordered checklist of acceptance criteria (640 total) with executable checks. Scoring is <b>checklist progress</b>: the length of the satisfied prefix divided by the total. This gives partial credit, which binary pass/fail cannot, and is exactly what we need to see how much progress survived a fault.</p>
+<p>Their paper (AgentRewind) found that environment recovery matters most, then context restoration, and that gains grow with task length. That is our desync hypothesis, already partly confirmed for agent-caused errors. We add infrastructure-caused faults.</p>
+<p>Because stock tasks have no long waits, add variants: a fake CI that takes 20–40 minutes per run; an approval step with a 1–3 hour simulated delay; a metered fake API with rate limits and intermittent 5xx. Same checklist, same grader.</p>
+
+<h3>Fault schedule</h3>
+<p>Seeded and identical across arms: SIGKILL mid-model-stream; SIGKILL mid-long-tool (during the test run); OOM during dependency install; container or VM destroyed (disk loss); harness version deploy mid-task; model API 529s for 10 minutes; network partition from the metered API; a fault landing during a CI wait; a fault landing during an approval wait; and a no-fault control.</p>
+
+<h3>Parameters</h3>
+<table>
+  <tr><th>Parameter</th><th>Meaning</th><th>Measured by</th></tr>
+  <tr><td class="k">Completion rate</td><td>Fraction passing all checklist items, per fault type, vs the no-fault control. The gap is the "durability tax".</td><td>MettleBench verifier</td></tr>
+  <tr><td class="k">Checklist progress</td><td>How far it got, even if it didn't finish</td><td>MettleBench prefix metric</td></tr>
+  <tr><td class="k">Terminal failure rate</td><td>Runs that die and never come back</td><td>Substrate logs</td></tr>
+  <tr><td class="k">Work lost</td><td>Turns, tool calls and edits completed before the fault that are absent after resume</td><td>Diff of pre-fault vs post-resume workspace and tool log</td></tr>
+  <tr><td class="k">Rework ratio</td><td>Tokens and tool calls after the fault that reproduce lost work, over totals</td><td>Trajectory analysis</td></tr>
+  <tr><td class="k">Duplicate side effects</td><td>External writes executed more than once per tool call id; and orphans (written externally, absent from transcript)</td><td>Fake service ledgers</td></tr>
+  <tr><td class="k">Desync events</td><td>Transcript asserts a workspace fact that is false; and whether the agent noticed before acting (a "wrong-action event" if not)</td><td>Replay tool-call claims against the actual filesystem</td></tr>
+  <tr><td class="k">Time to resume</td><td>Fault → first productive tool call</td><td>Timestamps</td></tr>
+  <tr><td class="k">Idle compute fraction</td><td>Billed seconds during which neither model nor tool was running</td><td>Billing / container metering</td></tr>
+  <tr><td class="k">Dollars per completed task</td><td>Compute plus model tokens including rework</td><td>All-in</td></tr>
+</table>
+
+<h3>Making it affordable</h3>
+<p>These runs cost \$100–300 each and models are non-deterministic. Record the no-fault trajectory once per task and seed; for fault runs, <b>replay the recorded model responses up to the fault point</b>, then go live. Every arm sees the identical prefix, so differences after the fault are attributable to the substrate. Still run 3 seeds for confidence intervals, but the fault matrix becomes an order of magnitude cheaper.</p>
+
+<!-- ============================================================ -->
+<h2 id="s3">4. Scenario 3 — Scheduler and reliability bench</h2>
+
+<div class="pitch">
+<b>Pitch.</b> Every background-job platform has a scheduler between "someone triggered a task" and "a worker is running it." Everyone advertises fast, fair, exact and reliable. Nobody publishes numbers. This bench produces them, and unlike the others it has no model variance, so it can run in CI and catch regressions release to release.
+</div>
+
+<h3>Six things it measures</h3>
+<table>
+  <tr><th>Parameter</th><th>Plain-English question</th><th>How</th></tr>
+  <tr><td class="k">Dequeue latency</td><td>You call trigger(); how long until your code's first line runs? At 1, 100, 10k concurrent.</td><td>p50/p95/p99 from ledger timestamps</td></tr>
+  <tr><td class="k">Fairness across queues</td><td>Tenant A submits 10,000 jobs, tenant B submits 10. Does B wait behind all of A?</td><td>B's completion time with vs without A's flood</td></tr>
+  <tr><td class="k">Concurrency key correctness</td><td>"At most 3 per customer." Under contention, crashes and cancels, is it ever exceeded? Does a slot ever leak and stay stuck?</td><td>Max overlap per key from start/end ledger</td></tr>
+  <tr><td class="k">Rate-limit accuracy</td><td>500 runs against a fake API allowing 100/min. How many 429s did the API see? How much throughput was left unused?</td><td>Fake API counters</td></tr>
+  <tr><td class="k">Cron drift and missed runs</td><td>Every-minute schedule over 24h: how far off is each firing? After a 20-minute outage: fire 20, skip, or fire one? Double-fire across a deploy?</td><td>Ledger vs expected schedule</td></tr>
+  <tr><td class="k">Priority</td><td>5,000 low-priority jobs, then one high-priority. How long until it runs?</td><td>Timestamps</td></tr>
+</table>
+<p>Build: a load generator with known submit timestamps and tags; a trivial task body that records dequeued, started, finished to Postgres; a metered fake API; a fault injector that kills workers mid-run and restarts the control plane during the cron window. Everything is computed from the ledger afterwards.</p>
+<p class="small">Why keep it even though it's the least exciting: it costs almost nothing once Scenario 1's self-hosted stack exists, every parameter is a property of the platform rather than of user code, and a cross-platform table (Trigger, Inngest, Temporal, Hatchet, BullMQ) is the kind of thing that gets cited.</p>
+
+<!-- ============================================================ -->
+<h2 id="s4">5. Scenario 4 — chat.agent bench</h2>
+
+<div class="pitch">
+<b>Pitch.</b> chat.agent claims that a conversation survives refreshes, deploys, idle gaps and crashes, that streams resume without re-running the model, and that waiting for a human is free. Build one real chat product on it, drive it with hundreds of simulated customers, break it in the specific ways chat breaks, and measure whether every message is answered exactly once. Do it by extending τ²-bench, so the tasks, oracle and metric are ones the field already trusts.
+</div>
+
+<h3>How chat.agent works (the 60-second version)</h3>
+<p>A conversation is a <b>Session</b> with two durable append-only streams: <code>.in</code> (user messages) and <code>.out</code> (assistant chunks). A long-lived <b>run</b> reads from one and writes to the other. The browser appends to <code>.in</code> and subscribes to <code>.out</code> with a cursor; there is no API route. Runs are disposable; the session is the identity.</p>
+<p>Three separate mechanisms make it durable, and each covers a different failure:</p>
+<table>
+  <tr><th>Layer</th><th>What it is</th><th>What it covers</th><th>What it does <u>not</u> cover</th></tr>
+  <tr><td class="k">1. Engine checkpoint</td><td>After 30s idle the whole process is frozen (CRIU) and compute freed; next message thaws it. Same process, memory intact.</td><td>Idle gaps between turns</td><td>Run exit or crash. Cloud only.</td></tr>
+  <tr><td class="k">2. Chat snapshot</td><td>Full message history written to S3 after every turn; a new run reads it and replays the stream tail</td><td>Run exit, crash, deploy, long idle</td><td>Anything in process memory. Action turns don't snapshot.</td></tr>
+  <tr><td class="k">3. Browser cursor</td><td>SSE resumes with Last-Event-ID</td><td>Tab refresh mid-stream</td><td>Run boundaries. The stream is trimmed to ~one turn with a 10–60s grace window.</td></tr>
+</table>
+<p>Other facts that shape the tests: runs never retry on failure except OOM (opt-in, one retry, bigger machine, whole turn re-runs so tools must be idempotent); a mid-stream crash is recovered by splicing the partial answer back into context ("recovery boot"); chunks are capped at ~1 MiB and that error fails the run; steering and compaction silently no-op unless a specific helper is spread into the model call.</p>
+
+<h3>Why chat is a different test than workflows</h3>
+<ul>
+  <li><b>The client is in the loop.</b> Half the failures happen in the browser: refresh, disconnect, send while streaming, stop, two tabs.</li>
+  <li><b>Turns are long and open-ended.</b> A single turn can run tools for minutes; the platform must not time out.</li>
+  <li><b>State is richer.</b> Message history, tool call state, pending approvals, a compaction summary, per-conversation memory.</li>
+  <li><b>The model is non-deterministic.</b> So we need scripted users, planted facts to verify recall, and k trials.</li>
+</ul>
+
+<h3>Build it on τ²-bench</h3>
+<p><a href="https://github.com/sierra-research/tau2-bench">τ²-bench</a> (Sierra, MIT) already provides the three hardest parts of a chat benchmark:</p>
+<div class="grid">
+  <div class="card"><h5>Realistic workloads</h5><p>Airline, retail, telecom domains: a policy document, a JSON database, tools, and 50–100 tasks each. Multi-turn, tool-using, policy-constrained.</p></div>
+  <div class="card"><h5>A user simulator</h5><p>An LLM playing a scripted persona with a goal. Exactly the "scripted customer" we want.</p></div>
+  <div class="card"><h5>A deterministic oracle</h5><p>Final database state hashed against a gold trajectory, plus required phrases. If a fault causes a duplicate refund or a double booking, the DB hash differs and the task fails. Exactly-once falls out for free.</p></div>
+</div>
+<p>Its tools are already exposed as an HTTP service, so the agent can be written in TypeScript on any substrate. Its metric is pass^k.</p>
+
+<h4>What we add</h4>
+<div class="flow">
+  <span>1. τ² environment server + idempotency keys + ledger</span><span class="arr">→</span>
+  <span>2. Same τ-agent on each substrate</span><span class="arr">→</span>
+  <span>3. Client driver that speaks the substrate's transport and misbehaves</span><span class="arr">→</span>
+  <span>4. Seeded fault schedule</span><span class="arr">→</span>
+  <span>5. τ² grader + invariant checks</span>
+</div>
+<ul>
+  <li><b>Substrates (arms)</b>: chat.agent; the hand-rolled baseline it replaced (useChat → Next.js route → streamText, with Redis resumable streams and Postgres history); Vercel Workflows <code>WorkflowAgent</code> (same claims, replay-based mechanism). Same model, same policy, same tools.</li>
+  <li><b>Client driver</b>: replaces τ²'s in-process turn loop with a real client. Client-side faults live here.</li>
+  <li><b>Task variants</b> (same policy, same gold DB state, so the grader is unchanged): slow tools (booking takes 2–10 min), approval-required tools (cancel, issue certificate) with 1 min to 2 h delays, idle gaps between turns (5 min, 1 h, 24 h), returning user next day, flaky environment (429/503 stretches).</li>
+</ul>
+
+<h3>What must hold, and the parameters</h3>
+<ol>
+  <li>Every user message is answered <b>exactly once</b>.</li>
+  <li>The transcript the user sees, the transcript the model sees, and the transcript in the DB <b>agree</b>.</li>
+  <li>Every tool side effect happens <b>exactly once</b> per tool call.</li>
+  <li>Compute is consumed <b>only while working</b>.</li>
+</ol>
+<table>
+  <tr><th>Parameter</th><th>Question</th><th>How</th></tr>
+  <tr><td class="k">Message integrity</td><td>Answered once / lost / duplicated, per fault type</td><td><code>.in</code> records vs assistant turns vs model-call ledger</td></tr>
+  <tr><td class="k">Transcript consistency</td><td>Do browser, model and DB views agree after a fault? Duplicate renders after refresh? Compaction fidelity?</td><td>Three-way diff; planted facts recalled after compaction</td></tr>
+  <tr><td class="k">Side-effect exactness</td><td>Duplicates and orphans per tool call id across OOM retry, crash mid-tool, HITL resume</td><td>Ledger, plus τ² DB hash</td></tr>
+  <tr><td class="k">Stream resume fidelity</td><td>Chunks lost or duplicated on reconnect; model re-invocations (should be zero)</td><td>Disconnect at random offsets; reconnect at 2s, 30s, 90s, 10min after turn end (probes the trim window)</td></tr>
+  <tr><td class="k">Recovery latency</td><td>Fault to first new chunk, per fault type</td><td>Timestamps</td></tr>
+  <tr><td class="k">Time to first chunk</td><td>Cold, warm, resumed, continuation; with/without Preload and Head Start</td><td>p50/p95</td></tr>
+  <tr><td class="k">Idle cost</td><td>Billed compute vs time model/tools actually ran; at 1 min, 1 h, 1 day idle; during a 2 h approval wait</td><td>Cloud billing (self-host has no suspend)</td></tr>
+  <tr><td class="k">Turn length ceiling</td><td>Longest single turn that completes: 5, 15, 45, 90, 180 min</td><td>Slow-tool variants</td></tr>
+  <tr><td class="k">Steering and stop</td><td>Stop → stream closed and next message accepted; mid-turn message injected or answered exactly once as next turn</td><td>Client driver</td></tr>
+  <tr><td class="k">Scale</td><td>200 / 1,000 / 5,000 concurrent sessions; mass-kill recovery time</td><td>Load generator</td></tr>
+  <tr><td class="k">Deploy behaviour</td><td>New version mid-conversation across 100 sessions: continued, lost context, ran old code, time to upgrade</td><td>Deploy fault</td></tr>
+  <tr><td class="k">State survival matrix</td><td>State kind × event → survived or not (heap, chat.local, filesystem, history, action mutation × idle 30s / 1h / crash / OOM / deploy)</td><td>Canaries per state kind</td></tr>
+</table>
+
+<h3>Chat-specific faults</h3>
+<p>Beyond the infrastructure faults from Scenario 1, twelve that only chat has. Several are regression probes for bugs Trigger has already fixed (their changelog is a map of the fragile seams):</p>
+<div class="grid">
+  <div class="card"><h5>Client side</h5><p>Refresh mid-stream · disconnect and reconnect at varying delays · send while streaming (with and without steering) · stop then immediately send · two tabs on one chat · silent dead socket (mobile)</p></div>
+  <div class="card"><h5>Boundary timing</h5><p>Message arriving exactly at the idle-suspend boundary · kill between the turn-complete marker and the snapshot write · action then crash before the next turn · crash with one in-flight user vs two (different recovery behaviour)</p></div>
+  <div class="card"><h5>Payload and waits</h5><p>Tool result at 1.1 MiB · approval arriving after the suspend timeout (continuation path) · approval body over the 512 KiB append cap</p></div>
+</div>
+<p class="small">Historical pattern from their changelog: almost every fixed bug was a duplicate-or-lost message at a boundary (suspend/resume, mid-stream send, stop, refresh, handover, continuation). That is the property class to hammer.</p>
+
+<h3>Output</h3>
+<div class="kpi">
+  <div><b>Headline</b><span>pass^k against fault density for chat.agent, hand-rolled baseline and Vercel, with the no-fault line</span></div>
+  <div><b>Durability tax</b><span>pass^k(no fault) − pass^k(f) per substrate and fault</span></div>
+  <div><b>State survival matrix</b><span>measured, with the self-host column marked "n/a" where checkpoints don't exist</span></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5">6. Scenario 5 — Dynamic workflows written by Claude vs Trigger.dev workflows written by Claude</h2>
+
+<div class="pitch">
+<b>Pitch.</b> Claude Code can now write a JavaScript orchestration script on the fly and run it across hundreds of subagents (a "dynamic workflow"). Claude can also write a Trigger.dev task for the same job. Same model, same task, same faults: which home for a model-written workflow is faster to start, cheaper to run, and loses less when something breaks? Nobody has measured this, and both vendors are betting on opposite answers.
+</div>
+
+<h3>What a dynamic workflow is (60-second version)</h3>
+<p>You type <code>ultracode: audit every route under src/routes/ for missing auth checks</code>. Instead of working turn by turn, Claude writes a script like this and hands it to a runtime that executes it in the background while your session stays free:</p>
+<pre style="background:var(--soft);padding:12px 14px;border-radius:8px;font-size:13px;overflow-x:auto"><code>const found = await agent('List every .ts file under src/routes/.', { schema: {...} })
+const audits = await pipeline(found.files, file =>
+  agent(`Audit ${file} for missing authentication checks.`, { label: file }))
+return audits.filter(Boolean)</code></pre>
+<p>Four primitives: <code>agent()</code> spawns a subagent, <code>parallel()</code> runs a set at once, <code>pipeline()</code> runs one per item, <code>phase()</code> groups them for the progress view. Everything else is plain JavaScript. Intermediate results stay in script variables, not in Claude's context. "Dynamic" means the script is synthesized fresh from the prompt every time; a good run can be saved as a slash command and becomes a static workflow.</p>
+
+<div class="note"><b>The key observation.</b> The runtime underneath is a miniature Temporal. Every <code>agent()</code> result is journaled by prompt; resume works by re-running the script from the top and returning saved results; <code>Date.now()</code>, <code>Math.random()</code> and <code>new Date()</code> throw inside the script so replay is deterministic. So this isn't "code mode vs durable execution." It's the same durable-execution idea on two very different engines, and the question is which engine.</div>
+
+<h3>Two axes, not one</h3>
+<table>
+  <tr><th></th><th>Who writes the workflow</th><th>What runs it</th></tr>
+  <tr><td class="k">Dynamic workflow</td><td>Claude, at runtime, per request, unreviewed</td><td>A session-scoped runtime inside the Claude Code process</td></tr>
+  <tr><td class="k">Trigger.dev task written by Claude</td><td>Claude, ahead of time, deployable, reviewable</td><td>Trigger's control plane: queues, retries, checkpoints, waits, tracing</td></tr>
+</table>
+<p>Both arms have Claude as the author, so authoring quality is controlled. What varies is the substrate. This makes Scenario 5 the mirror of Scenario 2: there the agent is the <i>workload</i> running on a substrate; here the agent is the <i>author</i> of the workflow and we ask which substrate should run its output.</p>
+
+<h3>Where the two are known to differ (what we expect the data to show)</h3>
+<table>
+  <tr><th>Dimension</th><th>Dynamic workflow</th><th>Trigger.dev task</th></tr>
+  <tr><td class="k">Time to first action</td><td>Seconds. No deploy.</td><td>Write, typecheck, <code>trigger deploy</code>: minutes at best.</td></tr>
+  <tr><td class="k">Survives process exit</td><td>Only within the same session or a <code>--resume</code> of it. A fresh session starts over.</td><td>Yes. Runs are independent of the client that triggered them.</td></tr>
+  <tr><td class="k">Resume granularity</td><td>Replay ordered by agent <i>start time</i>. If A starts first and fails after B, C, D completed, B, C, D all rerun. Worst case 100% of post-failure tokens wasted.</td><td>Per subtask. Completed <code>triggerAndWait</code> results and <code>wait</code> boundaries hold.</td></tr>
+  <tr><td class="k">Long waits (CI, human, rate limit)</td><td>No wait primitive, no mid-run user input. The process holds.</td><td><code>wait.for</code> / <code>wait.forToken</code>, checkpointed, zero compute on cloud.</td></tr>
+  <tr><td class="k">Side effects on resume</td><td>Script re-executes from the top; anything not wrapped in <code>agent()</code> runs again.</td><td>Same hazard, but idempotency keys and subtask results are first-class.</td></tr>
+  <tr><td class="k">Concurrency</td><td>16 agents max (fewer on small CPUs), 1,000 per run, local machine.</td><td>Elastic; concurrency limits and queues are configuration.</td></tr>
+  <tr><td class="k">Observability</td><td>A journal file and a TUI.</td><td>Traces, run history, metrics.</td></tr>
+  <tr><td class="k">Security</td><td>Strong: no filesystem, shell or imports from the script; only agents act.</td><td>Your code, your responsibility.</td></tr>
+</table>
+<p class="small">Prediction: dynamic workflows win time-to-start and adaptability; lose on redone work under a crash and on anything crossing a process boundary or a long wait. The size of those gaps is the result. If they're small, Trigger has a positioning problem; if they're large, Trigger has a very clear pitch to every team that has started using ultracode for real work.</p>
+
+<h3>Arms</h3>
+<table>
+  <tr><th>Arm</th><th>What it is</th><th>What it isolates</th></tr>
+  <tr><td class="k">A. Dynamic workflow, native</td><td>Claude Code writes and runs the script via the <code>Workflow</code> tool. Resume via <code>/workflows</code> or relaunch.</td><td>The product as shipped</td></tr>
+  <tr><td class="k">B. Same script on Trigger</td><td>The identical Claude-written script executed inside a Trigger task with a thin shim: <code>agent()</code> → <code>triggerAndWait</code> of a subagent task, <code>parallel</code>/<code>pipeline</code> → <code>batchTriggerAndWait</code>, journal replaced by Trigger run state.</td><td>Substrate effect alone, script held constant. The cell nobody has data on.</td></tr>
+  <tr><td class="k">C. Trigger task written by Claude</td><td>Claude is asked to build the same job as a native Trigger.dev project: tasks, subtasks, queues, waits, idempotency keys. Docs-only and with-skills variants, as in Scenario 1's author axis.</td><td>What Claude does when given Trigger's full primitive set</td></tr>
+  <tr><td class="k">D. Turn-by-turn subagents</td><td>Claude orchestrates with ordinary subagent calls, no script.</td><td>Lower bound; the thing dynamic workflows replaced</td></tr>
+</table>
+
+<h3>Tasks</h3>
+<p>Take the shapes Anthropic itself lists as workflow use cases and pick ones with a checkable end state, then add the two things dynamic workflows can't do natively:</p>
+<div class="grid">
+  <div class="card"><h5>Fan-out audit</h5><p>Audit 200 files for a planted class of bug; adversarially verify each finding. Oracle: recall and precision against the planted set.</p></div>
+  <div class="card"><h5>Fan-out migration</h5><p>Migrate 100 files JS → TS in isolated copies; typecheck each. Oracle: <code>tsc</code> clean, tests pass. Reuses MettleBench-style checklist scoring.</p></div>
+  <div class="card"><h5>Fix-until-green loop</h5><p>Run a checker, fix, repeat until it passes or two rounds make no progress. Oracle: final check state plus round count.</p></div>
+  <div class="card"><h5>Research with cross-check</h5><p>Fan out readers over a fixed local corpus with planted contradictions; vote on claims. Oracle: planted facts recovered, contradictions flagged.</p></div>
+  <div class="card"><h5>+ Wait variant</h5><p>Same migration, but each batch must pass a fake CI that takes 20 min, and the final merge needs an approval that arrives after 1 h.</p></div>
+  <div class="card"><h5>+ Side-effect variant</h5><p>Same audit, but each confirmed finding is filed as a ticket in a fake tracker with a ledger. Duplicates count.</p></div>
+</div>
+
+<h3>Faults (chosen for where the engines differ)</h3>
+<ul>
+  <li><b>Kill the orchestrator process mid-run</b>, then resume in a new session. The session-boundary failure.</li>
+  <li><b>One slow agent started early fails late.</b> Agent A hangs while B..N complete, then A dies. Probes the start-time-ordered replay and its rework.</li>
+  <li><b>Model API 529s for 10 minutes</b> mid-fan-out. Tests bounded retry vs. <code>null</code> results silently dropped by <code>.filter(Boolean)</code>.</li>
+  <li><b>A fault landing during the CI wait</b> and during the approval wait (wait variant only).</li>
+  <li><b>Laptop sleep / network drop</b> for 5 minutes (arm A runs on a developer machine; that is its real environment).</li>
+  <li><b>Deploy mid-run</b> (arms B, C): new task version while runs are live.</li>
+  <li>No-fault control.</li>
+</ul>
+
+<h3>Parameters</h3>
+<table>
+  <tr><th>Parameter</th><th>Meaning</th><th>Measured by</th></tr>
+  <tr><td class="k">Time to first action</td><td>Prompt submitted → first subagent tool call</td><td>Timestamps. Includes authoring and deploy for arm C.</td></tr>
+  <tr><td class="k">Authoring cost</td><td>Model tokens and wall-clock to produce a runnable workflow; number of attempts before it runs</td><td>Trajectory</td></tr>
+  <tr><td class="k">Completion rate / checklist progress</td><td>Task oracle, per fault, vs no-fault control. The gap is the durability tax.</td><td>Oracle</td></tr>
+  <tr><td class="k">Redone work</td><td>Agent invocations after a fault whose (prompt, options) already completed before it</td><td>Journal / run ledger</td></tr>
+  <tr><td class="k">Tokens wasted on resume</td><td>Tokens spent by redone agents, as a fraction of total</td><td>Per-agent usage</td></tr>
+  <tr><td class="k">Cross-session survival</td><td>Fraction of runs that complete after the orchestrator is killed and a fresh session/client starts</td><td>Binary per trial, reported as a rate</td></tr>
+  <tr><td class="k">Duplicate side effects</td><td>Tickets filed twice per finding (side-effect variant)</td><td>Fake tracker ledger</td></tr>
+  <tr><td class="k">Silent drops</td><td>Agents that returned <code>null</code> and were filtered out without the final report saying so</td><td>Compare planted set vs report vs journal</td></tr>
+  <tr><td class="k">Idle compute</td><td>Compute-seconds billed or a machine held during CI/approval waits</td><td>Metering (arm A: process alive; arms B/C: Trigger billing)</td></tr>
+  <tr><td class="k">Dollars per completed task</td><td>All-in, including rework</td><td>Tokens + compute</td></tr>
+  <tr><td class="k">Script quality</td><td>Does the Claude-written orchestration follow instructions it was given (model per phase, size guideline)? Same for Trigger primitives (idempotency keys present, waits used correctly)</td><td>Static check of the generated script / task code; footgun list as in Scenario 1</td></tr>
+</table>
+
+<h3>What the output looks like</h3>
+<div class="kpi">
+  <div><b>Headline</b><span>Completion and tokens-wasted-on-resume per arm per fault, with the no-fault line</span></div>
+  <div><b>The B-minus-A number</b><span>How much durability the same script gains just by changing the engine. This is Trigger's pitch to dynamic-workflow users, measured.</span></div>
+  <div><b>The C-minus-B number</b><span>How much more Claude gets by using Trigger's primitives natively rather than through a shim. This tells Trigger whether a "run your workflow script here" product is worth building.</span></div>
+</div>
+
+<div class="note"><b>Scope note.</b> Arm A depends on Claude Code internals that change release to release (replay order, session persistence, caps). Pin the version, record it, and expect to rerun. Arm B's shim is a small piece of engineering we'd build; if Trigger wants to productize it, the shim is the prototype.</div>
+
+<!-- ============================================================ -->
+<h2 id="cred">7. Making it credible</h2>
+
+<h3>Borrow the distributed-systems discipline</h3>
+<ul>
+  <li><b>Ledger + checker, not eyeballing.</b> Every effect is recorded with its key and timestamp by a fake service we control. A checker proves violations from the history. "No bug found" is reported with the number of fault-seconds run.</li>
+  <li><b>Seeded schedules.</b> Every fault has a seed and a trajectory position. Any result can be reproduced.</li>
+  <li><b>Fake external services everywhere.</b> Vendors, CI, approvers, payment, email. Real models only where the model is the thing being measured.</li>
+</ul>
+
+<h3>Controls</h3>
+<ul>
+  <li>Same workload spec, same fault schedule, same machine sizes, same pinned versions on every arm.</li>
+  <li>Deterministic fake model for platform properties (Scenarios 1, 3, most of 4). Real model only for TTFC, compaction fidelity and Scenario 2, reported separately.</li>
+  <li>Record-and-replay model responses up to the fault point so arms share the prefix.</li>
+  <li>k ≥ 4 trials; report pass^k with confidence intervals, never pass@1 alone.</li>
+</ul>
+
+<h3>Check our own benchmark's quality</h3>
+<p>A recent paper (<a href="https://arxiv.org/abs/2608.06329">"Benchmarking the Benchmarks"</a>, IBM, Aug 2026) grades τ-bench-style benchmarks on consistency (does the expected behaviour follow from the scenario and policy?) and coverage (what fraction of policy items are actually challenged by at least 3 tasks?). It found τ³-bench challenges only 31–46% of its own airline policy. We should run the same checks on our added task variants before spending money, and publish our coverage number: fraction of claimed platform guarantees challenged by at least K fault scenarios. That is how a benchmark meant to set a standard earns trust.</p>
+
+<h3>Use metrics the field already trusts</h3>
+<table>
+  <tr><th>Metric</th><th>From</th><th>We use it for</th></tr>
+  <tr><td class="k">pass^k</td><td>τ-bench</td><td>Reliability: all k trials must succeed</td></tr>
+  <tr><td class="k">Checklist prefix</td><td>MettleBench</td><td>Partial progress on long tasks</td></tr>
+  <tr><td class="k">Time horizon at 50% / 80%</td><td>METR</td><td>A "fault horizon": how much injected failure a substrate absorbs before completion drops below 80%</td></tr>
+  <tr><td class="k">p50 / p95 / p99</td><td>Standard</td><td>Every latency</td></tr>
+  <tr><td class="k">Linearizability-style checking</td><td>Jepsen</td><td>The exactly-once and ordering invariants</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="plan">8. Priorities, effort, open questions</h2>
+
+<h3>Suggested order</h3>
+<ol>
+  <li><b>Scenario 1 (expert column) + Scenario 4.</b> Both need the shared harness and the self-hosted stack. Scenario 1 is the platform story; Scenario 4 is the product Trigger is launching. Scenario 3 comes almost free once the stack exists.</li>
+  <li><b>Scenario 1 (LLM author columns).</b> Reuses everything; answers Trigger's goal 2 directly; produces the footgun list.</li>
+  <li><b>Scenario 2.</b> Most expensive (real models, hours per run), most headline-worthy. Do it once the harness is proven.</li>
+  <li><b>Scenario 5.</b> Cheap to start (arms A and D need no infrastructure), and the B-minus-A result is a direct marketing number for Trigger. Arm B's shim is the only new engineering; arm C reuses Scenario 1's author-axis prompting.</li>
+</ol>
+
+<h3>Rough effort</h3>
+<table>
+  <tr><th>Piece</th><th>Effort</th><th>Notes</th></tr>
+  <tr><td class="k">Shared harness</td><td>3–4 weeks</td><td>Fake services, ledger, fault injector, checker, self-hosted Trigger + Temporal in Docker</td></tr>
+  <tr><td class="k">Scenario 1 reference impls</td><td>2 weeks per platform</td><td>Lead-gen DAG; two platforms initially</td></tr>
+  <tr><td class="k">Scenario 4</td><td>3–4 weeks</td><td>τ² integration, client driver, three substrates, task variants</td></tr>
+  <tr><td class="k">Scenario 3</td><td>1 week</td><td>Once the stack exists</td></tr>
+  <tr><td class="k">Scenario 1 LLM columns</td><td>1–2 weeks + model spend</td><td>Prompting, per-model runs, footgun tests</td></tr>
+  <tr><td class="k">Scenario 2</td><td>4–6 weeks + model spend</td><td>Substrate arms, MettleBench integration, replay cache</td></tr>
+  <tr><td class="k">Scenario 5</td><td>2–3 weeks + model spend</td><td>Task oracles with planted bugs/facts, fake CI and tracker, the <code>agent()</code>→Trigger shim, Claude Code version pinning</td></tr>
+</table>
+
+<h3>Questions to take back to Trigger</h3>
+<ul>
+  <li>Access to the <b>Firecracker microVM runtime</b> (private beta). Whole-VM snapshots would change the state-survival matrix and are the strongest arm in Scenario 2.</li>
+  <li>Cloud <b>billing granularity</b> for measuring idle cost: can we get per-run compute-seconds?</li>
+  <li>Are they comfortable with <b>Temporal, Vercel and Inngest</b> as named columns? Two vendors is a duel; four is a standard.</li>
+  <li>Which of their <b>documented guarantees</b> do they most want challenged? We'd rather test the claims they will market than the ones we guessed.</li>
+  <li>Do they want the <b>footgun list</b> from the LLM-author columns fed back into their skills before we publish?</li>
+  <li>Is a <b>"run your dynamic workflow script on Trigger" shim</b> (Scenario 5, arm B) something they'd want to own? If so we build it as their prototype rather than as throwaway harness code.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="gloss">9. Glossary and references</h2>
+
+<h3>Glossary</h3>
+<table>
+  <tr><td class="k">Durable execution</td><td>Code that keeps running to completion across crashes, restarts and deploys, because its progress is persisted outside the process.</td></tr>
+  <tr><td class="k">Checkpoint (Trigger)</td><td>Freezing a running process (memory and all) so it can be thawed later on any machine. Cloud only.</td></tr>
+  <tr><td class="k">Replay (Temporal)</td><td>Rebuilding a workflow's state by re-running its code against a recorded history of events. Requires the code to be deterministic.</td></tr>
+  <tr><td class="k">Idempotent</td><td>Safe to run twice: the second run has no additional effect. Essential because every durable system retries.</td></tr>
+  <tr><td class="k">Idempotency key</td><td>A unique id sent with a side-effecting call so the receiver can recognise a retry and not do it again.</td></tr>
+  <tr><td class="k">Ledger</td><td>Our append-only record of every call to every fake service, with key and timestamp. The source of truth for "exactly once."</td></tr>
+  <tr><td class="k">Canary</td><td>A random value written into a program's local state at the start, checked after each wait/restart to see whether state survived.</td></tr>
+  <tr><td class="k">RTO</td><td>Recovery time objective: how long from failure to working again.</td></tr>
+  <tr><td class="k">pass^k</td><td>Fraction of tasks where all k independent trials succeed. Measures reliability, not luck.</td></tr>
+  <tr><td class="k">Fault schedule</td><td>A seeded list of what breaks, and at which point in the trajectory. Same schedule on every arm.</td></tr>
+  <tr><td class="k">Arm</td><td>One configuration under comparison (e.g. "Trigger.dev, expert-written").</td></tr>
+  <tr><td class="k">Desync</td><td>The agent's transcript claims something about the workspace that is no longer true after a restart.</td></tr>
+  <tr><td class="k">HITL</td><td>Human in the loop: the agent pauses for a person to approve or answer.</td></tr>
+  <tr><td class="k">Session / run (chat.agent)</td><td>The session is the durable identity of a conversation; runs are the disposable compute that serve it over time.</td></tr>
+  <tr><td class="k">Dynamic workflow</td><td>A Claude Code feature: Claude writes a JavaScript orchestration script (<code>agent()</code>, <code>parallel()</code>, <code>pipeline()</code>) and a background runtime executes it across many subagents, with journaled, replay-based resume within a session.</td></tr>
+  <tr><td class="k">Code mode</td><td>The general pattern of a model writing code that calls tools, run in a sandbox, so only the final output enters its context. Dynamic workflows are code mode applied to orchestration.</td></tr>
+</table>
+
+<h3>References</h3>
+<ul>
+  <li>Trigger.dev chat.agent docs: <a href="https://trigger.dev/docs/ai-chat/how-it-works">How it works</a>, <a href="https://trigger.dev/docs/ai-chat/patterns/recovery-boot">Recovery boot</a>, <a href="https://trigger.dev/docs/ai-chat/patterns/persistence-and-replay">Persistence and replay</a>, <a href="https://trigger.dev/docs/ai-chat/changelog">Changelog</a>, <a href="https://trigger.dev/docs/self-hosting/overview">Self-hosting</a></li>
+  <li>τ²-bench: <a href="https://github.com/sierra-research/tau2-bench">github.com/sierra-research/tau2-bench</a> (MIT)</li>
+  <li>MettleBench and AgentRewind: <a href="https://github.com/Kelvin-Coffee/MettleBench">repo</a>, <a href="https://arxiv.org/abs/2608.14380">paper</a></li>
+  <li>Benchmarking the Benchmarks (IBM, 2026): <a href="https://arxiv.org/abs/2608.06329">arxiv.org/abs/2608.06329</a></li>
+  <li>METR time horizons: <a href="https://metr.org/time-horizons/">metr.org/time-horizons</a></li>
+  <li>Temporal pre-production testing guide: <a href="https://github.com/temporalio/documentation/blob/main/docs/best-practices/pre-production-testing.mdx">docs source</a></li>
+  <li>Anthropic, "Scaling Managed Agents": <a href="https://www.anthropic.com/engineering/managed-agents">anthropic.com/engineering/managed-agents</a></li>
+  <li>Vercel Workflows / WorkflowAgent: <a href="https://vercel.com/docs/workflows">docs</a></li>
+  <li>DBOS vs Step Functions benchmark (example of vendor-run latency benchmark): <a href="https://github.com/dbos-inc/dbos-workflow-benchmarks">repo</a></li>
+  <li>Antithesis on deterministic simulation testing: <a href="https://antithesis.com/docs/resources/deterministic_simulation_testing/">docs</a></li>
+  <li>Example benchmark structures studied: <a href="https://github.com/new-measure/ITSMBench">ITSMBench</a>, <a href="https://github.com/collinear-ai/yc-bench">YC-Bench</a>, <a href="https://github.com/Sj0605-DataSci/triggerdevbench">triggerdevbench</a> (10 self-hosted platform probes; a Scenario 3 component and a source of regression faults)</li>
+  <li>Claude Code dynamic workflows: <a href="https://code.claude.com/docs/en/workflows">official docs</a>; <a href="https://dev.to/hesreallyhim/claude-code-workflows-critical-analysis-34dn">critical analysis of the replay/resume model</a>; <a href="https://github.com/QuintinShaw/pi-dynamic-workflows">pi-dynamic-workflows</a> (open-source equivalent)</li>
+  <li>Code mode / programmatic tool calling: <a href="https://blog.cloudflare.com/code-mode/">Cloudflare</a>, <a href="https://www.anthropic.com/engineering/advanced-tool-use">Anthropic</a>, <a href="https://modelcontextprotocol.io/docs/2025-03-26/develop/clients/client-best-practices">MCP client best practices</a></li>
+</ul>
+
+<p class="small" style="margin-top:40px">Prepared September 2026. Scenarios 1–4 follow the working document; the "LLM as author" experiment is folded into Scenario 1 as its author axis. Scenario 5 (dynamic workflows vs Trigger.dev, both authored by Claude) was added after reviewing Claude Code's workflow runtime.</p>
+
+</div>
+</body>
+</html>

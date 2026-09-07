@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+
+# generated per run
+tasks/*/workspace/
+tasks/*/environment/ledger.jsonl
+tasks/*/environment/oracle.json
+tasks/*/tests/results.json
+tasks/*/tests/reward.txt
+tasks/*/grader/ledger.jsonl
