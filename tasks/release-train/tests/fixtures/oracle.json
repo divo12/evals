@@ -1,0 +1,47 @@
+{
+  "seed": 42,
+  "services": [
+    "billing",
+    "invoices",
+    "payments",
+    "ledger",
+    "payouts",
+    "refunds",
+    "checkout",
+    "cart",
+    "catalog",
+    "pricing",
+    "inventory",
+    "shipping"
+  ],
+  "batches": [
+    [
+      "billing",
+      "ledger",
+      "checkout",
+      "pricing"
+    ],
+    [
+      "invoices",
+      "payouts",
+      "cart",
+      "inventory"
+    ],
+    [
+      "payments",
+      "refunds",
+      "catalog",
+      "shipping"
+    ]
+  ],
+  "degrade": [
+    "billing",
+    "invoices"
+  ],
+  "flaky": [
+    "cart",
+    "payments",
+    "payouts",
+    "shipping"
+  ]
+}

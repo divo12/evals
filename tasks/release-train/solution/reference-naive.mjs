@@ -8,13 +8,13 @@
  *   node solution/reference-naive.mjs
  *   bash tests/test.sh
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const workspace = join(here, "../workspace");
-const WORLD = process.env.WORLD_URL ?? "http://127.0.0.1:4747";
+const workspace = process.env.WORKSPACE ?? (existsSync("/app/RELEASE.md") ? "/app" : join(here, "../workspace"));
+const WORLD = process.env.WORLD_URL ?? "http://world:4747";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const api = async (method, path, body) => {
   const res = await fetch(WORLD + path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });

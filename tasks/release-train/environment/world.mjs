@@ -21,9 +21,9 @@ import { randomUUID } from "node:crypto";
 
 const envDir = dirname(fileURLToPath(import.meta.url));
 const taskDir = join(envDir, "..");
-const workspace = join(taskDir, "workspace");
-const ledgerPath = join(envDir, "ledger.jsonl");
-const oraclePath = join(envDir, "oracle.json");
+const workspace = process.env.WORKSPACE ?? join(taskDir, "workspace");
+const ledgerPath = process.env.LEDGER_PATH ?? join(envDir, "ledger.jsonl");
+const oraclePath = process.env.ORACLE_PATH ?? join(envDir, "oracle.json");
 
 if (!existsSync(oraclePath)) {
   console.error("oracle.json missing — run `node environment/generate.mjs` first");
@@ -41,7 +41,9 @@ const profileName = process.env.PROFILE ?? "smoke";
 const P = PROFILES[profileName];
 if (!P) { console.error(`unknown PROFILE ${profileName}`); process.exit(1); }
 const port = Number(process.env.PORT ?? 4747);
+const bind = process.env.BIND ?? "0.0.0.0";
 const publicUrl = process.env.WORLD_URL ?? `http://127.0.0.1:${port}`;
+const verifierToken = process.env.VERIFIER_TOKEN ?? "";
 
 // ---------------------------------------------------------------------------
 // state
@@ -272,6 +274,14 @@ const server = createServer(async (req, res) => {
 
   // --- meta
   if (req.method === "GET" && path === "/health") return send(200, { ok: true, profile: profileName, uptimeSec: Math.round((Date.now() - startedAt) / 1000) });
+  if (req.method === "GET" && path === "/internal/ledger") {
+    const got = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    if (!verifierToken || got !== verifierToken) return send(404, { error: "not found" });
+    const raw = existsSync(ledgerPath) ? readFileSync(ledgerPath, "utf8") : "";
+    res.writeHead(200, { "content-type": "application/x-ndjson" });
+    res.end(raw);
+    return;
+  }
   if (req.method === "GET" && path === "/windows") return send(200, { profile: profileName, seconds: P, batches: oracle.batches.map((b, i) => ({ name: `batch-${i + 1}`, services: b })) });
   if (req.method === "POST" && path === "/run/start") {
     const rec = ledger("run.start", { arm: body.arm ?? "unknown", note: body.note ?? null, pid: body.pid ?? null });
@@ -359,8 +369,8 @@ const server = createServer(async (req, res) => {
   send(404, { error: "not found", hint: "GET /windows lists what exists" });
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`world     ${publicUrl}   profile=${profileName}`);
+server.listen(port, bind, () => {
+  console.log(`world     ${publicUrl} bind=${bind}:${port} profile=${profileName}`);
   console.log(`ledger    ${ledgerPath}`);
   console.log(`windows   ci=${P.ci}s approvals=${P.approval.join("/")}s canary=${P.canary}s followUp=${P.followUp}s`);
 });

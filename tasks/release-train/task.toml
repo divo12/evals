@@ -1,43 +1,47 @@
+schema_version = "1.4"
+artifacts = []
+
 [task]
-name = "release-train"
-version = "0.1.0"
-title = "Unattended multi-batch patch release with approvals, canaries, rollbacks and a delayed follow-up"
-scenario = "5"                     # dynamic workflow written by Claude vs Trigger.dev workflow written by Claude
+name = "evals/release-train"
+version = "1.0.0"
+description = "Unattended multi-batch patch release: migrate services, pass CI, wait for delayed approvals, canary, roll back degraded services, promote the rest, then post a timed follow-up."
+authors = []
+keywords = ["durable-execution", "orchestration", "harbor", "trigger.dev"]
+
+[metadata]
 difficulty = "hard"
-category = "durable-orchestration"
-
-[task.arms]
-claude = "Claude Code (dynamic workflow / code mode / plain agent) orchestrating from the terminal"
-trigger = "Claude Code writing a Trigger.dev project (tasks + wait.forToken + wait.for + idempotencyKey) and deploying it"
-
-[environment]
-runtime = "node>=20"
-external_dependencies = []          # no npm packages, no docker; Trigger.dev arm needs an account + `npx trigger.dev`
-world = "environment/world.mjs"
-generate = "environment/generate.mjs"
-ledger = "environment/ledger.jsonl"
-oracle = "environment/oracle.json"  # hidden from the agent
-
-[environment.profiles]
-smoke = "ci 12s, approvals 20/35/50s, canary 45s, follow-up 60s (~4 min)"
-compressed = "ci 7m, approvals 25/40/55m, canary 30m, follow-up 60m (~3 h)"
-real = "ci 25m, approvals 4/6/8h, canary 2h, follow-up 24h (~1.5 d)"
-
-[faults]
-# injected by the operator during the graded run; log each with POST /fault
-planned = ["SIGKILL orchestrator process during canary window", "laptop sleep 10 min during approval wait", "SIGKILL orchestrator between last promotion and follow-up"]
+category = "automation"
+tags = ["release-train", "idempotency", "canary", "approvals"]
 
 [verifier]
-command = "bash tests/test.sh"
-reward_file = "tests/reward.txt"
-results_file = "tests/results.json"
+timeout_sec = 180.0
 
-[verifier.invariants]
-exactly_once = "each service: 1 canary; healthy: 1 promote, 0 rollback; degraded: 1 rollback, 0 promote; all with idempotencyKey"
-gates = "each batch approved once; canary only after approval decision; promote only after canary window (world-enforced)"
-rollback_latency = "degraded canaries rolled back within tolerance after error rate crosses 5%"
-follow_up = "exactly one #releases message, followUp window after last promotion (±10%), listing patched/rolledBack"
-autonomy = "exactly one POST /run/start; any further start = human relaunch = reward 0"
+[verifier.env]
+VERIFIER_TOKEN = "harbor-release-train-grade"
+WORLD_URL = "http://world:4747"
 
-[verifier.reported_metrics]
-metrics = ["wallClockSeconds", "rollbackLatencySeconds", "followUpDeltaSeconds", "polls", "callbacksUsed", "deployRejected", "deployDeduplicated", "ciAttempts", "relaunches", "faultsInjected"]
+[agent]
+timeout_sec = 900.0
+
+[environment]
+network_mode = "public"
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 2
+memory_mb = 4096
+storage_mb = 10240
+
+[environment.env]
+WORLD_URL = "http://world:4747"
+WORKSPACE = "/app"
+PROFILE = "smoke"
+
+[environment.healthcheck]
+command = "curl -fsS http://world:4747/health"
+interval_sec = 2.0
+timeout_sec = 5.0
+retries = 30
+
+[solution.env]
+WORLD_URL = "http://world:4747"
+WORKSPACE = "/app"

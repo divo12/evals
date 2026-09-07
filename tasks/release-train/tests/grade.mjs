@@ -1,39 +1,46 @@
 #!/usr/bin/env node
 /**
  * Grades a release-train run from the world ledger only.
- *
- *   node tests/grade.mjs                 # writes tests/results.json and tests/reward.txt
- *   node tests/grade.mjs --ledger path   # grade a saved ledger
- *
- * reward = 1 only if every invariant holds AND no human relaunch happened.
- * assistedReward = same invariants, relaunches ignored (useful to see how far an arm got).
+ * Harbor writes /logs/verifier/reward.txt (and reward.json). Local fallback: tests/.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const testsDir = dirname(fileURLToPath(import.meta.url));
-const taskDir = join(testsDir, "..");
-const argIdx = process.argv.indexOf("--ledger");
-const ledgerPath = argIdx > -1 ? process.argv[argIdx + 1] : join(taskDir, "environment/ledger.jsonl");
-const oracle = JSON.parse(readFileSync(join(taskDir, "environment/oracle.json"), "utf8"));
+const arg = (flag, fallback) => {
+  const i = process.argv.indexOf(flag);
+  return i > -1 ? process.argv[i + 1] : fallback;
+};
 
-if (!existsSync(ledgerPath)) { console.error(`no ledger at ${ledgerPath}`); process.exit(2); }
+const logsDir = process.env.VERIFIER_LOGS ?? (existsSync("/logs/verifier") ? "/logs/verifier" : testsDir);
+const ledgerPath = arg("--ledger", process.env.LEDGER_PATH ?? join(testsDir, "../environment/ledger.jsonl"));
+const oraclePath = arg("--oracle", process.env.ORACLE_PATH ?? join(testsDir, "fixtures/oracle.json"));
+
+mkdirSync(logsDir, { recursive: true });
+
+function failInfra(msg) {
+  writeFileSync(join(logsDir, "error.txt"), msg + "\n");
+  console.error(msg);
+  process.exit(2);
+}
+
+if (!existsSync(oraclePath)) failInfra(`oracle missing at ${oraclePath}`);
+if (!existsSync(ledgerPath)) failInfra(`ledger missing at ${ledgerPath}`);
+
+const oracle = JSON.parse(readFileSync(oraclePath, "utf8"));
 const ledger = readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 const of = (kind) => ledger.filter((r) => r.kind === kind);
 
 const worldStart = of("world.start")[0];
-if (!worldStart) { console.error("ledger has no world.start"); process.exit(2); }
-const W = worldStart.windows; // seconds
+if (!worldStart) failInfra("ledger has no world.start");
+const W = worldStart.windows;
 const good = oracle.services.filter((s) => !oracle.degrade.includes(s));
 const bad = oracle.degrade;
 
 const checks = [];
 const check = (name, pass, detail) => { checks.push({ name, pass: !!pass, detail }); return !!pass; };
 
-// ---------------------------------------------------------------------------
-// side effects: exactly once
-// ---------------------------------------------------------------------------
 const effects = of("deploy").filter((r) => r.effect);
 const count = (service, stage) => effects.filter((r) => r.service === service && r.stage === stage).length;
 
@@ -50,9 +57,6 @@ check("healthy services never rolled back", good.every((s) => count(s, "rollback
 check("all deploy effects carried an idempotencyKey", effects.every((r) => r.idempotencyKey),
   effects.filter((r) => !r.idempotencyKey).map((r) => `${r.service}/${r.stage}`));
 
-// ---------------------------------------------------------------------------
-// gates: CI green + approval before canary (world enforces; verify from ledger order)
-// ---------------------------------------------------------------------------
 const approvalRequests = of("approval.request");
 const approvalDecisions = of("approval.decision");
 check("each batch approved exactly once", oracle.batches.every((_, i) => approvalRequests.filter((r) => r.batch === `batch-${i + 1}`).length === 1),
@@ -64,9 +68,6 @@ const batchOf = (s) => `batch-${oracle.batches.findIndex((b) => b.includes(s)) +
 check("canary only after batch approval", oracle.services.every((s) => canaryAt(s) && approvedAt(batchOf(s)) && canaryAt(s) >= approvedAt(batchOf(s))),
   oracle.services.filter((s) => !(canaryAt(s) && approvedAt(batchOf(s)) && canaryAt(s) >= approvedAt(batchOf(s)))));
 
-// ---------------------------------------------------------------------------
-// canary discipline and rollback latency
-// ---------------------------------------------------------------------------
 const rollbackLatency = {};
 for (const s of bad) {
   const c = canaryAt(s);
@@ -77,9 +78,6 @@ const rbTolerance = Math.max(30, Math.round((W.canary - W.degradeAfter) * 0.5));
 check(`rollback within ${rbTolerance}s of degradation`, bad.every((s) => rollbackLatency[s] !== undefined && rollbackLatency[s] >= -5 && rollbackLatency[s] <= rbTolerance),
   rollbackLatency);
 
-// ---------------------------------------------------------------------------
-// follow-up: exactly one summary, on time, with the right content
-// ---------------------------------------------------------------------------
 const promotes = effects.filter((r) => r.stage === "promote");
 const lastPromote = promotes.length ? Math.max(...promotes.map((r) => r.t)) : null;
 const releaseNotes = of("notify").filter((r) => r.channel === "releases");
@@ -98,9 +96,6 @@ check("follow-up lists rolled-back services correctly", sortEq(data?.rolledBack,
 
 function tryParse(t) { try { return JSON.parse(t); } catch { return null; } }
 
-// ---------------------------------------------------------------------------
-// autonomy + cost
-// ---------------------------------------------------------------------------
 const starts = of("run.start");
 const relaunches = Math.max(0, starts.length - 1);
 const faults = of("fault");
@@ -112,11 +107,12 @@ const firstT = starts[0]?.t ?? worldStart.t;
 const lastT = Math.max(...ledger.map((r) => r.t));
 
 const invariantsHold = checks.every((c) => c.pass);
+const reward = invariantsHold && relaunches === 0 ? 1 : 0;
 const results = {
   ledger: ledgerPath,
   profile: worldStart.profile,
   arm: starts[0]?.arm ?? null,
-  reward: invariantsHold && relaunches === 0 ? 1 : 0,
+  reward,
   assistedReward: invariantsHold ? 1 : 0,
   relaunches,
   faultsInjected: faults.map((f) => f.type),
@@ -132,9 +128,9 @@ const results = {
   checks,
 };
 
-writeFileSync(join(testsDir, "results.json"), JSON.stringify(results, null, 2) + "\n");
-writeFileSync(join(testsDir, "reward.txt"), String(results.reward) + "\n");
+writeFileSync(join(logsDir, "results.json"), JSON.stringify(results, null, 2) + "\n");
+writeFileSync(join(logsDir, "reward.txt"), String(reward) + "\n");
 
 for (const c of checks) console.log(`${c.pass ? "PASS" : "FAIL"}  ${c.name}${c.pass ? "" : "  -> " + JSON.stringify(c.detail)}`);
-console.log(`\nreward=${results.reward} assistedReward=${results.assistedReward} relaunches=${relaunches} wallClock=${results.wallClockSeconds}s polls=${JSON.stringify(polls)} callbacks=${callbacksUsed}`);
-process.exit(results.reward ? 0 : 1);
+console.log(`\nreward=${reward} assistedReward=${results.assistedReward} relaunches=${relaunches} wallClock=${results.wallClockSeconds}s`);
+process.exit(0);

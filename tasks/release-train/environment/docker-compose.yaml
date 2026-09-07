@@ -1,0 +1,45 @@
+services:
+  main:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app
+    depends_on:
+      world:
+        condition: service_healthy
+    volumes:
+      - workspace:/app
+    environment:
+      WORLD_URL: http://world:4747
+      WORKSPACE: /app
+
+  world:
+    build:
+      context: .
+      dockerfile: Dockerfile.world
+    volumes:
+      - workspace:/app
+    environment:
+      PROFILE: "${PROFILE:-smoke}"
+      PORT: "4747"
+      BIND: "0.0.0.0"
+      WORLD_URL: http://world:4747
+      WORKSPACE: /app
+      ORACLE_PATH: /hidden/oracle.json
+      LEDGER_PATH: /hidden/ledger.jsonl
+      VERIFIER_TOKEN: "${VERIFIER_TOKEN:-harbor-release-train-grade}"
+    expose:
+      - "4747"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4747/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks:
+      default:
+        aliases:
+          - world
+
+volumes:
+  workspace:

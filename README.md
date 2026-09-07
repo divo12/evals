@@ -1,24 +1,33 @@
 # evals
 
-Benchmarks for durable execution and long-running agents, built for Trigger.dev.
-Design notes and the five scenarios: `docs/trigger-dev-eval-scenarios.html`.
+Harbor tasks for durable-agent and long-horizon coding evals (Trigger.dev Scenario 5).
+
+Layout matches [ITSMBench](https://github.com/new-measure/ITSMBench) and the Harbor 0.22 task format, plus an eval-engineering `Task.md` (Draft) beside each package.
+
+## Prerequisites
+
+- [Harbor](https://github.com/laude-institute/harbor) 0.22 (`harbor --version`)
+- Docker
 
 ## Tasks
 
-| Task | Scenario | What it measures | Deps |
-|---|---|---|---|
-| `tasks/release-train/` | 5 (Claude workflow vs Claude + Trigger.dev) | Unattended multi-batch release: CI, delayed approvals, canaries, rollbacks, exactly-once deploys, timed follow-up, survival of SIGKILL / sleep | Node ≥ 20 |
-| `tasks/ultracode-auth-audit/` | 5 (warm-up) | Fan-out audit with verifier agents, ticket side effects, flaky CI that outlasts the stall watchdog | Node ≥ 20 |
+| Task | What it measures | Harbor path |
+|---|---|---|
+| `tasks/release-train/` | Unattended gated release: CI, delayed approvals, canaries, rollbacks, exactly-once deploys, timed follow-up | `-p tasks/release-train` |
+| `tasks/ultracode-auth-audit/` | Fan-out auth audit, tracker side effects, flaky CI | `-p tasks/ultracode-auth-audit` |
 
-Each task follows the ITSMBench layout: `task.toml`, `instruction.md` (given to the agent),
-`environment/` (the world + generator), `tests/` (verifier → `reward.txt`), `solution/`.
-Grading is ledger-only: what the agent says it did is ignored; what hit the world counts.
+Each task has `instruction.md` (agent input), `environment/Dockerfile` + `docker-compose.yaml` (sidecar `world` or `tracker`), `tests/test.sh` (writes `/logs/verifier/reward.txt`), and `solution/solve.sh` (Oracle). Hidden oracles live in `tests/fixtures/` and are not copied into the `main` image.
 
-## Quick start
+## Run the reference path (Oracle)
 
 ```bash
-cd tasks/release-train
-./run.sh up smoke                 # terminal 1: world + generated workspace
-cd workspace && claude            # terminal 2: paste ../instruction.md
-../run.sh grade                   # after the run
+harbor run -p tasks/ultracode-auth-audit -a oracle -e docker -n 1 -y
+harbor run -p tasks/release-train -a oracle -e docker -n 1 -y
 ```
+
+`release-train` defaults to `PROFILE=smoke` (~5–15 minutes). For the product comparison, set `PROFILE=compressed` and raise the agent timeout.
+
+Jobs are written under `jobs/`.
+
+Design notes: `docs/trigger-dev-eval-scenarios.html`.
+Task specs are **Draft** (Harbor conversion requested end-to-end without a spec-approval pause).

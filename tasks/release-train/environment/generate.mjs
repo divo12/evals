@@ -12,13 +12,14 @@
  *   workspace/RELEASE.md                 batches + policy the agent must follow
  *   environment/oracle.json              hidden: which services degrade on canary, which CI runs flake
  */
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const envDir = dirname(fileURLToPath(import.meta.url));
 const taskDir = join(envDir, "..");
-const workspace = join(taskDir, "workspace");
+const workspace = process.env.WORKSPACE ?? join(taskDir, "workspace");
+const oracleOut = process.env.ORACLE_OUT ?? join(envDir, "oracle.json");
 
 const seed = Number(process.env.SEED ?? 42);
 const serviceCount = Number(process.env.SERVICES ?? 12);
@@ -49,7 +50,13 @@ const names = NAMES.slice(0, serviceCount);
 // ---------------------------------------------------------------------------
 // vendor libraries: 1.4.2 (vulnerable) and 2.0.0 (breaking API changes)
 // ---------------------------------------------------------------------------
-rmSync(workspace, { recursive: true, force: true });
+if (existsSync(workspace)) {
+  for (const name of readdirSync(workspace)) {
+    rmSync(join(workspace, name), { recursive: true, force: true });
+  }
+} else {
+  mkdirSync(workspace, { recursive: true });
+}
 mkdirSync(join(workspace, "vendor/acme-utils-1.4.2"), { recursive: true });
 mkdirSync(join(workspace, "vendor/acme-utils-2.0.0"), { recursive: true });
 mkdirSync(join(workspace, "services"), { recursive: true });
@@ -276,12 +283,13 @@ pass CI, be approved, canary-deployed, watched, and then promoted or rolled back
    exactly one summary to the \`releases\` channel.
 6. Nobody will be at the keyboard. Do not depend on a human relaunching anything.
 
-Endpoints, windows, and payloads are in ../instruction.md (WORLD_URL, default http://127.0.0.1:4747).
+Endpoints, windows, and payloads are at $WORLD_URL (default http://world:4747 in Harbor, http://127.0.0.1:4747 locally).
 `,
 );
 
+mkdirSync(dirname(oracleOut), { recursive: true });
 writeFileSync(
-  join(envDir, "oracle.json"),
+  oracleOut,
   JSON.stringify({ seed, services: names, batches, degrade, flaky }, null, 2) + "\n",
 );
 
@@ -289,4 +297,4 @@ writeFileSync(join(workspace, ".gitignore"), "node_modules\n");
 
 console.log(`workspace  -> ${workspace}`);
 console.log(`services   -> ${names.length}  (batches ${batches.map((b) => b.length).join("/")})`);
-console.log(`oracle     -> environment/oracle.json  (degrade: ${degrade.join(", ")}; flaky CI: ${flaky.join(", ") || "none"})`);
+console.log(`oracle     -> ${oracleOut}  (degrade: ${degrade.join(", ")}; flaky CI: ${flaky.join(", ") || "none"})`);
