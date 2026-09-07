@@ -1,0 +1,45 @@
+schema_version = "1.4"
+artifacts = []
+
+[task]
+name = "evals/release-train-treatment"
+version = "1.0.0"
+description = "Treatment arm: write a Trigger.dev workflow that ships the ACME release train, then let the sidecar worker run it."
+authors = []
+keywords = ["durable-execution", "orchestration", "harbor", "trigger.dev", "treatment"]
+
+[metadata]
+difficulty = "hard"
+category = "automation"
+tags = ["release-train", "trigger.dev", "idempotency", "canary", "approvals"]
+
+[verifier]
+timeout_sec = 180.0
+
+[verifier.env]
+VERIFIER_TOKEN = "harbor-release-train-grade"
+WORLD_URL = "http://world:4747"
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+network_mode = "public"
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 2
+memory_mb = 4096
+storage_mb = 10240
+
+[environment.env]
+WORLD_URL = "http://world:4747"
+WORKSPACE = "/app"
+PROFILE = "smoke"
+TRIGGER_SECRET_KEY = "${TRIGGER_SECRET_KEY}"
+TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
+
+[environment.healthcheck]
+command = "curl -fsS http://world:4747/health"
+interval_sec = 2.0
+timeout_sec = 5.0
+retries = 30

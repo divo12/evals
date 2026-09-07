@@ -12,7 +12,7 @@ services:
 
   trigger-dev:
     build:
-      context: ../../tasks/release-train/environment/trigger-dev
+      context: ../../tasks/release-train/treatment/environment/trigger-dev
     env_file:
       - path: ../../.env
         required: false

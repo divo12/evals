@@ -2,11 +2,11 @@ schema_version = "1.4"
 artifacts = []
 
 [task]
-name = "evals/release-train"
+name = "evals/release-train-control"
 version = "1.0.0"
 description = "Unattended multi-batch patch release: migrate services, pass CI, wait for delayed approvals, canary, roll back degraded services, promote the rest, then post a timed follow-up."
 authors = []
-keywords = ["durable-execution", "orchestration", "harbor", "trigger.dev"]
+keywords = ["durable-execution", "orchestration", "harbor", "control"]
 
 [metadata]
 difficulty = "hard"
@@ -35,8 +35,6 @@ storage_mb = 10240
 WORLD_URL = "http://world:4747"
 WORKSPACE = "/app"
 PROFILE = "smoke"
-TRIGGER_SECRET_KEY = "${TRIGGER_SECRET_KEY}"
-TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
 
 [environment.healthcheck]
 command = "curl -fsS http://world:4747/health"

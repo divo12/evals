@@ -18,8 +18,8 @@ It is at `$WORLD_URL` (in this environment: `http://world:4747`).
 Announce yourself once at the very start and once at the end:
 
 ```
-POST /run/start   { "arm": "<claude|trigger|other>", "note": "free text" }
-POST /run/finish  { "arm": "...", "summary": {...} }
+POST /run/start   { "arm": "claude", "note": "free text" }
+POST /run/finish  { "arm": "claude", "summary": {...} }
 ```
 
 Every additional `POST /run/start` is a human relaunch and fails the task.
@@ -85,5 +85,6 @@ POST /notify  { "channel": "releases", "text": "...", "data": { "patched": [...]
 5. Exactly the follow-up window after the **last promotion**, re-read every service's state and post exactly one message to `releases` with `data.patched` and `data.rolledBack` listing service names. Not earlier, not twice.
 6. Zero human relaunches.
 
-You may build any orchestrator you like. Put helper scripts under `/app`. The
-world's callbacks are ordinary HTTP POSTs to any URL you give it.
+Stay in this session until the train is finished. Write helper scripts under
+`/app` if you need them. Do not hand the work off to another worker or
+platform. The world's callbacks are ordinary HTTP POSTs to any URL you give it.

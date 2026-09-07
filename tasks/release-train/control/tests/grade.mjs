@@ -12,6 +12,16 @@ const arg = (flag, fallback) => {
   const i = process.argv.indexOf(flag);
   return i > -1 ? process.argv[i + 1] : fallback;
 };
+const requireTrigger = process.argv.includes("--require-trigger");
+
+function isTriggerWaitUrl(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === "trigger.dev" || host.endsWith(".trigger.dev");
+  } catch {
+    return false;
+  }
+}
 
 const logsDir = process.env.VERIFIER_LOGS ?? (existsSync("/logs/verifier") ? "/logs/verifier" : testsDir);
 const ledgerPath = arg("--ledger", process.env.LEDGER_PATH ?? join(testsDir, "../environment/ledger.jsonl"));
@@ -100,6 +110,14 @@ const starts = of("run.start");
 const relaunches = Math.max(0, starts.length - 1);
 const faults = of("fault");
 check("run announced itself (POST /run/start)", starts.length >= 1, starts.length);
+
+if (requireTrigger) {
+  const callbacks = of("callback").filter((r) => r.status >= 200 && r.status < 300 && isTriggerWaitUrl(r.url));
+  check("CI finished via a Trigger wait token", callbacks.some((r) => r.event === "ci.finished"),
+    of("callback").filter((r) => r.event === "ci.finished").map((r) => r.url));
+  check("approval decided via a Trigger wait token", callbacks.some((r) => r.event === "approval.decided"),
+    of("callback").filter((r) => r.event === "approval.decided").map((r) => r.url));
+}
 
 const polls = { ci: of("ci.poll").length, approvals: of("approval.poll").length, metrics: of("metrics.read").length, services: of("service.read").length };
 const callbacksUsed = of("callback").length;

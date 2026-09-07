@@ -2,7 +2,7 @@
 
 Harbor tasks for durable-agent and long-horizon coding evals (Trigger.dev Scenario 5).
 
-Layout matches [ITSMBench](https://github.com/new-measure/ITSMBench) and the Harbor 0.22 task format, plus an eval-engineering `Task.md` (Draft) beside each package.
+Layout matches [ITSMBench](https://github.com/new-measure/ITSMBench) and the Harbor 0.22 task format. `tasks/release-train/Task.md` covers both arms; Harbor packages live in `control/` and `treatment/`.
 
 ## Prerequisites
 
@@ -13,16 +13,19 @@ Layout matches [ITSMBench](https://github.com/new-measure/ITSMBench) and the Har
 
 | Task | What it measures | Harbor path |
 |---|---|---|
-| `tasks/release-train/` | Unattended gated release: CI, delayed approvals, canaries, rollbacks, exactly-once deploys, timed follow-up | `-p tasks/release-train` |
+| `tasks/release-train/control/` | Control: session-bound gated release | `-p tasks/release-train/control` |
+| `tasks/release-train/treatment/` | Treatment: same train, written as Trigger.dev | `-p tasks/release-train/treatment` |
 | `tasks/ultracode-auth-audit/` | Fan-out auth audit, tracker side effects, flaky CI | `-p tasks/ultracode-auth-audit` |
 
-Each task has `instruction.md` (agent input), `environment/Dockerfile` + `docker-compose.yaml` (sidecar `world` or `tracker`), `tests/test.sh` (writes `/logs/verifier/reward.txt`), and `solution/solve.sh` (Oracle). Hidden oracles live in `tests/fixtures/` and are not copied into the `main` image.
+Each Harbor package has `instruction.md`, `environment/`, and `tests/test.sh` (writes `/logs/verifier/reward.txt`). Control has `solution/solve.sh` (Oracle). Hidden oracles live in `tests/fixtures/` and are not copied into the `main` image.
 
 ## Run the reference path (Oracle)
 
 ```bash
 harbor run -p tasks/ultracode-auth-audit -a oracle -e docker -n 1 -y
-harbor run -p tasks/release-train -a oracle -e docker -n 1 -y
+harbor run -p tasks/release-train/control -a oracle -e docker -n 1 -y
+# treatment needs cloud keys; no Oracle solution yet
+# harbor run -p tasks/release-train/treatment --env-file .env -e docker -n 1 -y
 ```
 
 `release-train` defaults to `PROFILE=smoke` (~5–15 minutes). For the product comparison, set `PROFILE=compressed` and raise the agent timeout.
