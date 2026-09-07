@@ -9,3 +9,6 @@ tasks/*/environment/oracle.json
 tasks/*/tests/results.json
 tasks/*/tests/reward.txt
 tasks/*/grader/
+
+# secrets
+.env

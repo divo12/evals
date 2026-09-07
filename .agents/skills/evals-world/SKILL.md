@@ -26,6 +26,7 @@ pass. Do not treat it as human-approved.
 |---|---|---|
 | Harbor package shape | `tasks/release-train/task.toml` | schema_version 1.4 example used in this repo |
 | Sidecar world + shared workspace volume | `tasks/release-train/environment/docker-compose.yaml` | agent edits `/app`; world runs `check.mjs` on those files |
+| Trigger worker that survives the agent | `tasks/release-train/environment/trigger-dev/` | seeded project + `trigger dev`; cloud keys |
 | Hidden oracle | `tests/fixtures/oracle.json` in each task | never COPY into the `main` image |
 | Ledger grading | `GET /internal/ledger` with `[verifier.env].VERIFIER_TOKEN` | 404 without the bearer token |
 

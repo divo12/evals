@@ -31,8 +31,4 @@ Things that would make the Trigger arm fail the same way as the Claude arm — w
 - Random idempotency keys.
 - `wait.for` shorter than the flake window with no retry wrapper.
 
-Local vs cloud: with `npx trigger.dev dev` the runs execute on the laptop; laptop sleep pauses
-them and they resume on wake (waits use server timers, so wall-clock deadlines still fire on
-time). With `npx trigger.dev deploy`, the callbacks must reach the world — either run the world
-on a public URL (`WORLD_URL=https://... PORT=4747`) via a tunnel, or keep the Trigger arm in
-`dev` mode. The `dev` mode is fine for the compressed profile.
+Chosen arm: sidecar `trigger-dev` + cloud keys. The sidecar seeds `/app/orchestrator` and runs `trigger dev`. Waits live on `api.trigger.dev`; the worker stays on the compose net and calls `world:4747`. `world` POSTs public `wait.forToken` URLs. Keys go in repo-root `.env`. Do not run `dev` inside `main`. Do not `deploy` (worker would leave the compose net).

@@ -1,0 +1,33 @@
+# Kill-test: worker lives outside the agent container.
+#
+#   docker compose -f environments/trigger-dev/docker-compose.sidecar.yaml up --build
+#   docker kill $(docker compose -f ... ps -q fake-agent)
+#   docker compose -f ... ps   # trigger-dev still running
+services:
+  fake-agent:
+    image: node:22-bookworm-slim
+    command: ["sleep", "infinity"]
+    volumes:
+      - workspace:/app
+
+  trigger-dev:
+    build:
+      context: ../../tasks/release-train/environment/trigger-dev
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      TRIGGER_SECRET_KEY: "${TRIGGER_SECRET_KEY:-}"
+      TRIGGER_ACCESS_TOKEN: "${TRIGGER_SECRET_KEY:-}"
+      TRIGGER_PROJECT_REF: "${TRIGGER_PROJECT_REF:-proj_smoke}"
+    volumes:
+      - workspace:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "test", "-f", "/app/orchestrator/trigger.config.ts"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  workspace:
