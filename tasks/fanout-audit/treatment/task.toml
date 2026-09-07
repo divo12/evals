@@ -1,0 +1,57 @@
+schema_version = "1.4"
+artifacts = []
+
+[task]
+name = "evals/fanout-audit-treatment"
+version = "1.0.0"
+description = "Treatment: write a Trigger.dev parent plus model subagent children that audit routes and file tracker tickets."
+authors = []
+keywords = ["fan-out", "subagents", "harbor", "trigger.dev", "treatment"]
+
+[metadata]
+difficulty = "medium"
+category = "software_engineering"
+tags = ["auth-audit", "fan-out", "trigger.dev"]
+
+[verifier]
+timeout_sec = 120.0
+
+[verifier.env]
+VERIFIER_TOKEN = "harbor-fanout-audit-grade"
+TRACKER_URL = "http://tracker:9410"
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+network_mode = "public"
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 2
+memory_mb = 4096
+storage_mb = 5120
+
+[environment.env]
+TRACKER_URL = "http://tracker:9410"
+WORKSPACE = "/app"
+CI_SECONDS = "12"
+TRIGGER_SECRET_KEY = "${TRIGGER_SECRET_KEY}"
+TRIGGER_ACCESS_TOKEN = "${TRIGGER_ACCESS_TOKEN}"
+TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
+ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY:-}"
+CLAUDE_CODE_OAUTH_TOKEN = "${CLAUDE_CODE_OAUTH_TOKEN}"
+
+[environment.healthcheck]
+command = "curl -fsS http://tracker:9410/health"
+interval_sec = 2.0
+timeout_sec = 5.0
+retries = 20
+
+[solution.env]
+TRACKER_URL = "http://tracker:9410"
+WORKSPACE = "/app"
+TRIGGER_SECRET_KEY = "${TRIGGER_SECRET_KEY}"
+TRIGGER_ACCESS_TOKEN = "${TRIGGER_ACCESS_TOKEN}"
+TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
+ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY:-}"
+CLAUDE_CODE_OAUTH_TOKEN = "${CLAUDE_CODE_OAUTH_TOKEN}"

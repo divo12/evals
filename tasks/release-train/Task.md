@@ -22,7 +22,7 @@ Two Harbor packages, one world, one ledger:
   - Treatment: Claude writes a Trigger.dev workflow. Waits must be `wait.forToken` / `wait.for` / `wait.until`, not an in-session poll loop.
 - Why this case matters: Scenario 5. Same world and grader; only the orchestrator changes.
 - Repository, trace, existing Task, or human evidence: naive reference `control/solution/reference-naive.mjs` passed Harbor Oracle on this world; sidecar `treatment/environment/trigger-dev`; world logs `callback.url`.
-- Difference from existing Tasks: one family with two packages. Warmup is `tasks/ultracode-auth-audit`.
+- Difference from existing Tasks: one family with two Harbor packages.
 
 ## Agent input
 
@@ -30,15 +30,15 @@ Two Harbor packages, one world, one ledger:
 - Later user turns or event input, if any: none. Operator SIGKILL of `main` is outside the default Harbor trial.
 - Context supplied outside the instruction:
   - Both: `RELEASE.md`, `services/`, `vendor/` generated into `/app`; `WORLD_URL=http://world:4747`.
-  - Treatment only: seeded `/app/orchestrator`; `TRIGGER_SECRET_KEY` and `TRIGGER_PROJECT_REF`.
+  - Treatment only: seeded `/app/orchestrator`; `TRIGGER_SECRET_KEY`, `TRIGGER_ACCESS_TOKEN` (`tr_pat_…`), and `TRIGGER_PROJECT_REF`.
 
 ## Relevant agent conditions
 
 - Control: long idle waits in-process. The session must stay alive until the train finishes.
-- Treatment: author Trigger tasks, start one run, then idle. Harbor grades when the agent exits, so `main` must outlast the workflow even though the worker does the waits.
+- Treatment: author Trigger tasks, start one run, then idle. Harbor grades when the agent exits, so `main` must outlast the workflow even though the worker does the waits. Seeded `trigger.config.ts` disables default retries (`enabledInDev: false`) because a parent retry after `/run/start` is a relaunch.
 - Tools: HTTP to `world:4747`; filesystem under `/app`. Treatment also uses the sidecar worker and Trigger Cloud.
 - Material differences from normal operation: default `PROFILE=smoke`. `PROFILE=compressed` / `real` need a larger `[agent].timeout_sec`. Default Harbor does not SIGKILL `main`.
-- Credentials: none on control. Treatment needs `TRIGGER_SECRET_KEY` and `TRIGGER_PROJECT_REF` from operator `.env`. `VERIFIER_TOKEN` is verifier-only.
+- Credentials: none on control. Treatment needs `TRIGGER_SECRET_KEY` (`tr_dev_…`), `TRIGGER_ACCESS_TOKEN` (`tr_pat_…` for `trigger dev`), and `TRIGGER_PROJECT_REF` from operator `.env`. Do not set `TRIGGER_ACCESS_TOKEN` to the project secret. `VERIFIER_TOKEN` is verifier-only.
 
 ## Environment
 
@@ -54,7 +54,7 @@ Shared:
 
 Control-only: compose is `main` + `world`. No Trigger keys. No sidecar.
 
-Treatment-only: compose adds `trigger-dev` (seeds `/app/orchestrator`, runs `trigger dev`). `network_mode = "public"` so `world` can POST wait-token URLs. Cloud `deploy` is invalid (worker would leave the compose net).
+Treatment-only: compose adds `trigger-dev` (seeds `/app/orchestrator` with `defineConfig`, `@trigger.dev/sdk` + `@trigger.dev/build` 4.5.16, and a `worker-ready` ping task, then runs `trigger dev`). `network_mode = "public"` so `world` can POST wait-token URLs. Cloud `deploy` is invalid (worker would leave the compose net). `trigger dev` authenticates with a personal access token, not the project secret.
 
 ## Verification
 
@@ -95,6 +95,6 @@ Treatment only (`grade.mjs --require-trigger`):
 ## Open decisions
 
 - Human decisions: Draft. Layout `control/` + `treatment/` with family spec at this root.
-- Run plan: `harbor run -p tasks/release-train/control -a oracle -e docker -n 1`. Treatment has no Oracle solution. Model trials not authorized.
+- Run plan: `harbor run -p tasks/release-train/control -a oracle -e docker -n 1`. Treatment: `harbor run -p tasks/release-train/treatment -a oracle --env-file .env -e docker -n 1`. Model trials not authorized.
 - Assumptions: Harbor grades when the agent exits; `world` hostname works; treatment `world` has egress to `api.trigger.dev`.
 - Remaining questions: Trigger reference `solve.sh`; whether Harbor should wait on world completion instead of agent exit; whether `PROFILE=compressed` should be the default scored timeout.

@@ -1,0 +1,28 @@
+{
+  "seed": 42,
+  "planted": [
+    "api-keys",
+    "audit-log",
+    "projects",
+    "users"
+  ],
+  "publicRoutes": [],
+  "allRoutes": [
+    "users",
+    "orders",
+    "payments",
+    "invoices",
+    "accounts",
+    "sessions",
+    "projects",
+    "teams",
+    "members",
+    "invites",
+    "webhooks",
+    "api-keys",
+    "billing",
+    "usage",
+    "audit-log",
+    "notifications"
+  ]
+}

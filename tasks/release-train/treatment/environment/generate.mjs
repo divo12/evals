@@ -52,6 +52,7 @@ const names = NAMES.slice(0, serviceCount);
 // ---------------------------------------------------------------------------
 if (existsSync(workspace)) {
   for (const name of readdirSync(workspace)) {
+    if (name === "orchestrator") continue;
     rmSync(join(workspace, name), { recursive: true, force: true });
   }
 } else {

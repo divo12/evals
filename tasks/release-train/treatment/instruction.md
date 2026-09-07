@@ -22,12 +22,25 @@ Write the workflow under `/app/orchestrator`:
 /app/orchestrator/src/trigger/*.ts      # your tasks
 ```
 
-`TRIGGER_SECRET_KEY` and `TRIGGER_PROJECT_REF` are already in the environment.
+`TRIGGER_SECRET_KEY`, `TRIGGER_ACCESS_TOKEN`, and `TRIGGER_PROJECT_REF` are already
+in the environment. Use them from the Trigger.dev project on the shared volume.
+The worker is already authenticated; do not run `login`, `dev`, or `deploy`.
 
 For CI and approvals, create a wait token and pass `token.url` as `callback.url`.
-Then `await wait.forToken(token)`. Do not busy-poll `GET /ci/run/:id` or
+Then `await wait.forToken(token).unwrap()`. Do not busy-poll `GET /ci/run/:id` or
 `GET /approvals/:id`. For the canary window and the follow-up delay, use
 `wait.for` or `wait.until`.
+
+Keep CI, approvals, and deploys in the parent task. Do not `batchTriggerAndWait`
+child tasks for this train — on `trigger dev` those children often fail with
+`COULD_NOT_FIND_EXECUTOR`. Set `retry: { maxAttempts: 1 }` on the parent.
+A Trigger retry after `POST /run/start` counts as a human relaunch.
+
+After you write or change files under `/app/orchestrator/src/trigger`, wait
+until the sidecar has indexed a new worker version before you trigger a run.
+If a run sits in `PENDING_VERSION` or fails with `COULD_NOT_FIND_EXECUTOR`,
+wait and trigger again — that means the local executor was still swapping.
+Do not start a second train after `/run/start` has already been posted.
 
 After you trigger the workflow, you may idle in this session until the train
 finishes. Harbor ends the trial when you exit.

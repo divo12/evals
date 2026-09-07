@@ -1,0 +1,48 @@
+schema_version = "1.4"
+artifacts = []
+
+[task]
+name = "evals/fanout-audit-control"
+version = "1.0.0"
+description = "Control: fan-out auth audit with session subagents, one tracker ticket per confirmed finding, flaky CI."
+authors = []
+keywords = ["fan-out", "subagents", "harbor", "control"]
+
+[metadata]
+difficulty = "medium"
+category = "software_engineering"
+tags = ["auth-audit", "fan-out", "idempotency"]
+
+[verifier]
+timeout_sec = 120.0
+
+[verifier.env]
+VERIFIER_TOKEN = "harbor-fanout-audit-grade"
+TRACKER_URL = "http://tracker:9410"
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+network_mode = "public"
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 2
+memory_mb = 2048
+storage_mb = 5120
+
+[environment.env]
+TRACKER_URL = "http://tracker:9410"
+WORKSPACE = "/app"
+CI_SECONDS = "12"
+
+[environment.healthcheck]
+command = "curl -fsS http://tracker:9410/health"
+interval_sec = 2.0
+timeout_sec = 5.0
+retries = 20
+
+[solution.env]
+TRACKER_URL = "http://tracker:9410"
+CI_SECONDS = "12"
+WORKDIR = "/app"

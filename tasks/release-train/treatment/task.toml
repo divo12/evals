@@ -36,6 +36,7 @@ WORLD_URL = "http://world:4747"
 WORKSPACE = "/app"
 PROFILE = "smoke"
 TRIGGER_SECRET_KEY = "${TRIGGER_SECRET_KEY}"
+TRIGGER_ACCESS_TOKEN = "${TRIGGER_ACCESS_TOKEN}"
 TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
 
 [environment.healthcheck]
@@ -43,3 +44,10 @@ command = "curl -fsS http://world:4747/health"
 interval_sec = 2.0
 timeout_sec = 5.0
 retries = 30
+
+[solution.env]
+WORLD_URL = "http://world:4747"
+WORKSPACE = "/app"
+TRIGGER_SECRET_KEY = "${TRIGGER_SECRET_KEY}"
+TRIGGER_ACCESS_TOKEN = "${TRIGGER_ACCESS_TOKEN}"
+TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"

@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@trigger.dev/sdk": "4.5.16"
+    "@ai-sdk/anthropic": "^2.0.0",
+    "@trigger.dev/sdk": "4.5.16",
+    "ai": "^5.0.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@trigger.dev/build": "4.5.16",
