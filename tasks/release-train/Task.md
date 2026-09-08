@@ -38,9 +38,9 @@ Two Harbor packages, one world, one ledger:
 
 - Both arms use Codex with `gpt-5.6-sol`, high reasoning effort, host ChatGPT authentication forwarded by `CODEX_FORCE_AUTH_JSON=1`, the same tool configuration, and the same authoring budget.
 - Control: `$codex-dynamic-workflows` and native Codex subagents must perform the service migration/verification decomposition; long waits remain in-process. A trajectory without the skill and substantive subagent work is an invalid arm assignment.
-- Treatment: load `trigger-authoring-tasks`, author Trigger tasks, start one run, then idle. Harbor grades when the agent exits, so `main` must outlast the workflow even though the worker does the waits. Seeded `trigger.config.ts` disables default retries (`enabledInDev: false`) because a parent retry after `/run/start` is a relaunch.
+- Treatment: load `trigger-authoring-tasks`, author Trigger tasks, then run the seeded `trigger-once.mjs` helper and exit immediately. The helper owns worker-readiness checks, triggers one accepted run, and writes `/app/trigger-run.json`; the verifier keeps Compose alive and waits up to 720s for `/run/finish`. Seeded `trigger.config.ts` disables default retries (`enabledInDev: false`) because a parent retry after `/run/start` is a relaunch.
 - Tools: HTTP to `world:4747`; filesystem under `/app`. Treatment also uses the sidecar worker and Trigger Cloud.
-- Material differences from normal operation: default `PROFILE=smoke`; both arms allow 20 minutes for Codex authoring plus the timed workflow. `PROFILE=compressed` / `real` need a larger `[agent].timeout_sec`. Default Harbor does not SIGKILL `main`, so this package alone makes no crash-recovery claim.
+- Material differences from normal operation: default `PROFILE=smoke`; control allows 20 minutes for Codex plus local execution, while treatment allows 15 minutes for authoring/handoff and 14 minutes for verifier waiting. `PROFILE=compressed` / `real` need larger timeouts. Default Harbor does not SIGKILL `main`, so this package alone makes no crash-recovery claim.
 - Credentials: none on control. Treatment needs `TRIGGER_SECRET_KEY` (`tr_dev_…`), `TRIGGER_ACCESS_TOKEN` (`tr_pat_…` for `trigger dev`), and `TRIGGER_PROJECT_REF` from operator `.env`. Do not set `TRIGGER_ACCESS_TOKEN` to the project secret. `VERIFIER_TOKEN` is verifier-only.
 
 ## Environment
@@ -58,6 +58,11 @@ Shared:
 Control-only: compose is `main` + `world`. No Trigger keys. No sidecar.
 
 Treatment-only: compose adds `trigger-dev` (seeds `/app/orchestrator` with `defineConfig`, `@trigger.dev/sdk` + `@trigger.dev/build` 4.5.16, and a `worker-ready` ping task, then runs `trigger dev`). `network_mode = "public"` so `world` can POST wait-token URLs. Cloud `deploy` is invalid (worker would leave the compose net). `trigger dev` authenticates with a personal access token, not the project secret.
+
+Treatment handoff: the Codex process ends after writing a Trigger run handle.
+`tests/test.sh` uses verifier-only ledger access to wait for the asynchronous
+workflow before invoking the shared grader. The run handle decides whether to
+wait; it is not trusted as success evidence.
 
 ## Verification
 
@@ -87,7 +92,7 @@ Treatment only (`grade.mjs --require-trigger`):
 - Control accepted alternatives: any `$codex-dynamic-workflows` decomposition for migration and verification, with session-local wait/deploy logic. Trigger is not provided.
 - Treatment accepted alternatives: any Trigger task graph that uses wait tokens for CI and approvals. A polling loop that finishes the ledger still fails the Trigger rows.
 - Complete pass rule: listed rows for that arm AND relaunches == 0. Reward 1 or 0.
-- Invalid-run conditions: world unhealthy; protected CI or ledger unavailable; missing control skill/subagent use; missing treatment Trigger skill or keys; mismatched author model, reasoning, tools, or budget.
+- Invalid-run conditions: world unhealthy; protected CI or ledger unavailable during the verifier wait; missing control skill/subagent use; missing treatment Trigger skill or keys; mismatched author model, reasoning, tools, or budget.
 
 ## Fairness and leakage
 
@@ -101,28 +106,35 @@ Treatment only (`grade.mjs --require-trigger`):
 ## Open decisions
 
 - Human decisions: Draft. Audit fixes implemented; changed scoring and protected CI behavior await review.
-- Run plan executed: one Oracle and one `gpt-5.6-sol` high-reasoning Codex trial per arm; no judge; 1200s agent timeout.
-- Assumptions: Harbor grades when the agent exits; `world` hostname works; treatment `world` has egress to `api.trigger.dev`.
+- Run plan executed: control plus fire-and-exit treatment Oracles and `gpt-5.6-sol` high-reasoning Codex trials; no judge. Control timeout 1200s; treatment author timeout 900s and verifier timeout 840s.
+- Assumptions: Harbor starts the treatment verifier when Codex exits; the verifier keeps Compose alive; `world` hostname works; treatment `world` has egress to `api.trigger.dev`.
 - Remaining questions: add a separately specified orchestrator-kill variant with an automatic resume policy; whether `PROFILE=compressed` should be the default scored timeout.
 
 ## Calibration evidence
 
 - Oracle control: `jobs/codex-release-oracle-control`, reward 1, no exception.
-- Oracle treatment: `jobs/codex-release-oracle-treatment-fixed`, reward 1,
-  19 successful Trigger callbacks, zero CI/approval polls, no exception.
+- Fire-and-exit Oracle treatment: `jobs/release-treatment-helper-oracle`, reward
+  1, no exception. Agent handoff 5s; verifier wait 387s; 19 successful Trigger
+  callbacks and zero CI/approval polls.
 - Codex control: `jobs/codex-release-train-control-20260908T101855Z`, reward
-  1, no exception, 826s total, 150,582 input / 131,968 cached / 2,266 output
-  tokens, $0.1725632 recorded cost. The skill created workflow artifacts and
-  three native batch-migration subagents. World ledger span: 594s.
-- Codex treatment: `jobs/codex-release-treatment-1200s`, reward 1, no
-  exception, 1,037s total, 2,265,988 input / 2,185,088 cached / 16,040 output
-  tokens, $1.5184352 recorded cost. Codex loaded the pinned Trigger skill,
-  authored one Trigger run, used 19 callbacks, and made zero CI/approval polls.
-  World ledger span: 462s.
+  1, no exception, 826s total. The skill created workflow artifacts and three
+  native batch-migration subagents. World ledger span: 594s. Harbor reported
+  only its most recent rollout's $0.1725632 cost, so control's aggregate token
+  and cost metrics are incomplete.
+- Fire-and-exit Codex treatment: `jobs/release-treatment-helper-codex`, reward
+  1, no exception, 930s total. Codex authored and handed off in 533s; the
+  verifier waited 307s with no model active. Usage was 467,034 input / 416,768
+  cached / 14,307 output tokens and $0.6539112. The run used 19 callbacks and
+  zero CI/approval polls; world ledger span 316s.
+- Superseded monitoring treatment: `jobs/codex-release-treatment-1200s`, reward
+  1 and $1.5184352, but Codex stayed alive to monitor Trigger. It is not part of
+  the current comparison.
 - Invalid setup evidence: `jobs/codex-release-train-control-20260908T101210Z`
   used Harbor's empty API-key fallback and failed 401 before agent work.
   `jobs/codex-release-train-treatment-20260908T101855Z` reached reward 1 but
-  hit the old 900s agent timeout before clean exit. Neither is scored.
+  hit the old 900s agent timeout before clean exit.
+  `jobs/release-treatment-fire-exit-codex` hit an experimental 600s authoring
+  cutoff before handoff. None is scored.
 - One trial per arm establishes reachability, not a stable performance ranking.
-  Total Harbor runtime is comparable; world-ledger span is not an authoring
-  metric because the arms post `/run/start` at different stages.
+  Cost is not comparable until control is rerun with valid unredacted parent
+  and subagent artifacts and summarized across all sessions.

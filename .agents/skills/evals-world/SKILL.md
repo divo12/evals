@@ -52,8 +52,14 @@ Keep the two worlds identical except compose sidecar, instruction, and the
 verifier flag. Copy generators, sidecars, and `grade.mjs` rather than forking
 behavior.
 
-Harbor grades when the agent exits. Both arms must keep `main` alive until the
-work finishes. Current packages do not inject process faults.
+Harbor invokes the verifier when the agent exits. Release treatment writes
+`/app/trigger-run.json` and exits after one trigger; its verifier keeps the
+Compose stack alive and waits for ledger `run.finish`. Current packages do not
+inject process faults.
+
+Release treatment uses seeded `/app/orchestrator/trigger-once.mjs` for worker
+readiness and one accepted trigger. This keeps Codex from spending authoring
+tokens inspecting `/proc` or `.trigger` internals.
 
 Do not store planted route lists or degrade-service names here.
 
@@ -148,12 +154,16 @@ produces an invalid 401 run.
   shared grader; it passed all rows with two CI attempts.
 - Release-train control Oracle (`jobs/fixed-release-control-oracle`) proves the
   protected CI runner and expanded ledger checks; it passed all rows in 333s.
-- Release-train Codex needs a 1200s agent timeout: the Trigger task completed
-  eight seconds before the old 900s cutoff, leaving no time for a clean agent
-  exit. Treat that old timeout result as infrastructure, even if reward is 1.
-- The first valid Codex pair is recorded in `tasks/release-train/Task.md`.
-  Control used three native subagents; treatment loaded the official Trigger
-  skill and passed all wait-token rows. One trial proves reachability only.
+- The old release treatment needed a 1200s agent timeout only because Codex
+  monitored Trigger until completion. The current treatment is fire-and-exit;
+  the verifier owns the asynchronous wait.
+- Current calibration is recorded in `tasks/release-train/Task.md`. Control
+  used three native subagents; fire-and-exit treatment loaded the official
+  Trigger skill and passed all wait-token rows. One trial proves reachability
+  only.
+- Harbor's Codex adapter converts only the latest rollout in a directory, so a
+  control run with subagents undercounts tokens and cost. Use
+  `scripts/summarize-codex-job.mjs` to sum all parent and subagent sessions.
 - Compare prompt-to-job-completion time across arms. Do not compare the world
   ledger spans as authoring latency: control announces before authoring while
   treatment announces inside the authored Trigger task.

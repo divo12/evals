@@ -56,12 +56,27 @@ These packages are no-fault baselines. They measure authoring and successful
 execution in `trigger dev`; they do not establish production deployment or
 crash-recovery durability.
 
+Release treatment is fire-and-exit: Codex writes one Trigger run handle and
+ends. Its verifier waits for the asynchronous workflow, so Codex tokens are not
+spent monitoring Trigger execution.
+
 Deterministic verifier checks:
 
 ```bash
 node tasks/fanout-audit/check-grader.mjs
 node tasks/release-train/check-protected-ci.mjs
 ```
+
+Harbor reports only one Codex rollout when an arm spawns subagents. Sum every
+parent/subagent session before comparing cost:
+
+```bash
+node scripts/summarize-codex-job.mjs jobs/<job-name>
+```
+
+The estimator records GPT-5.6 Sol's 2026-09-08 standard rates; recheck the
+[official API pricing](https://developers.openai.com/api/docs/pricing) before a
+later study.
 
 Jobs are written under `jobs/`.
 

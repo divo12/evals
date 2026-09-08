@@ -16,6 +16,7 @@ harbor run -p tasks/release-train/treatment -a oracle --env-file .env -e docker 
 
 Control compose is `main` + `world`. Treatment adds `trigger-dev`. Same ledger
 grader; treatment requires every CI/approval completion to match a successful
-Trigger wait-token callback and rejects polling. This is a no-fault baseline.
+Trigger wait-token callback and rejects polling. Treatment Codex exits after
+one trigger; the verifier waits for asynchronous completion. This is a no-fault baseline.
 
 Use `scripts/run-codex-pair.sh release-train .env` from the repository root.

@@ -40,14 +40,23 @@ child tasks for this train — on `trigger dev` those children often fail with
 `COULD_NOT_FIND_EXECUTOR`. Set `retry: { maxAttempts: 1 }` on the parent.
 A Trigger retry after `POST /run/start` counts as a human relaunch.
 
-After you write or change files under `/app/orchestrator/src/trigger`, wait
-until the sidecar has indexed a new worker version before you trigger a run.
-If a run sits in `PENDING_VERSION` or fails with `COULD_NOT_FIND_EXECUTOR`,
-wait and trigger again — that means the local executor was still swapping.
-Do not start a second train after `/run/start` has already been posted.
+Do not call `/run/start`, CI, approval, deploy, metrics, service, notification,
+or `/run/finish` endpoints from this Codex session; the Trigger task owns every
+world operation. After one run is accepted, write its handle to
+`/app/trigger-run.json` as `{ "runId": "run_...", "taskId": "..." }` and exit
+immediately. Do not retrieve, poll, or wait for the Trigger run. Harbor's
+verifier waits independently for the workflow to finish.
 
-After you trigger the workflow, you may idle in this session until the train
-finishes. Harbor ends the trial when you exit.
+After TypeScript passes, use the seeded handoff helper:
+
+```bash
+cd /app/orchestrator
+node trigger-once.mjs acme-release-train
+```
+
+The helper waits for the authored task to be indexed, triggers exactly one
+accepted run, and writes `/app/trigger-run.json`. Do not inspect `/proc` or
+`.trigger` internals; do not perform extra readiness or run-status checks.
 
 ## The world
 
