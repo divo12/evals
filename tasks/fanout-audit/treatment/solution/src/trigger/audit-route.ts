@@ -1,6 +1,6 @@
 import { task, logger } from "@trigger.dev/sdk";
 import { generateText, tool, stepCountIs } from "ai";
-import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,12 +18,14 @@ export const auditRoute = task({
   retry: { maxAttempts: 1 },
   run: async (payload: { route: string }) => {
     const route = payload.route;
-    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const model = process.env.ANTHROPIC_MODEL;
-    if (!model) throw new Error("missing ANTHROPIC_MODEL");
+    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const model = process.env.OPENAI_MODEL;
+    if (!model) throw new Error("missing OPENAI_MODEL");
 
     const { text } = await generateText({
-      model: anthropic(model),
+      model: openai(model),
+      maxOutputTokens: 500,
+      providerOptions: { openai: { reasoningEffort: "high" } },
       tools: {
         readRoute: tool({
           description: "Read this route's TypeScript source",

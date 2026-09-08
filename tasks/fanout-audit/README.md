@@ -4,8 +4,8 @@ Same planted auth-audit. Two Harbor arms.
 
 | Arm | Path | What the agent does |
 |---|---|---|
-| Control | `control/` | Runs a native Claude Code Workflow in the session |
-| Treatment | `treatment/` | Writes a Trigger.dev parent + Claude child tasks; sidecar runs them |
+| Control | `control/` | Uses `codex-dynamic-workflows` and native Codex subagents |
+| Treatment | `treatment/` | The same Codex authors Trigger.dev + GPT-5.6 Sol child tasks |
 
 Human spec: [`Task.md`](Task.md). Do not copy that file into either agent image.
 
@@ -15,5 +15,4 @@ harbor run -p tasks/fanout-audit/treatment -a oracle --env-file .env -e docker -
 ```
 
 Smoke is 16 routes / 4 planted (`ROUTE_COUNT=16`, `PLANTED=4`). Treatment needs
-Trigger keys plus `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`. The model must
-match the Claude release used by control Workflow children.
+Trigger keys plus `OPENAI_API_KEY`; `OPENAI_MODEL` is fixed to `gpt-5.6-sol`.

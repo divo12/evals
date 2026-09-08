@@ -28,7 +28,8 @@ Write `/app/report.json` with:
 { "confirmed": ["route", ...], "rejected": ["route", ...], "tickets": ["tkt_..."] }
 ```
 
-Use Claude Code's native `Workflow` tool to fan the route review out to model
-subagents and independently verify suspected findings. Stay in this session
-until the audit and CI are finished. Do not hand the work to Trigger.dev or
-another worker platform.
+Use `$codex-dynamic-workflows` to plan and run this audit as a dynamic Codex
+subagent workflow. You are authorized to create workflow artifacts under
+`/app/.workflow` and spawn up to 16 subagents with at most 4 running at once.
+Independently verify suspected findings, stay until the audit and CI finish,
+and do not hand the work to Trigger.dev or another worker platform.

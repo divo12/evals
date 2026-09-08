@@ -18,21 +18,23 @@ Do not run `trigger deploy`.
 ```
 
 `TRIGGER_SECRET_KEY` and `TRIGGER_PROJECT_REF` are in your environment.
-`ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` are available only to the Trigger
+`OPENAI_API_KEY` and `OPENAI_MODEL` are available only to the Trigger
 worker. The worker is already authenticated; do not run
 `login`, `dev`, or `deploy`.
 
-Call Claude from inside a Trigger child task with Vercel AI SDK `generateText`
-and `@ai-sdk/anthropic`.
+Call GPT-5.6 Sol from inside a Trigger child task with Vercel AI SDK
+`generateText` and `@ai-sdk/openai`, using high reasoning effort.
 
 ```ts
 import { generateText } from "ai";
-import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 
-const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 await generateText({
-  model: anthropic(process.env.ANTHROPIC_MODEL!),
+  model: openai(process.env.OPENAI_MODEL!),
+  maxOutputTokens: 500,
+  providerOptions: { openai: { reasoningEffort: "high" } },
   prompt: "...",
   experimental_telemetry: { isEnabled: true },
 });
@@ -41,7 +43,7 @@ await generateText({
 Export the parent as task id `fa-fanout-audit` and its child as
 `fa-audit-route`. The parent must list the route files, then fan out with one
 or more concurrent `batchTriggerAndWait` calls. Each child is a subagent: it
-must call Claude with tools to read its route and relevant authentication-wrapper
+must call GPT-5.6 Sol with tools to read its route and relevant authentication-wrapper
 source, then return `{ confirmed, route, reason }`. Do not
 decide findings with a regex in the parent.
 

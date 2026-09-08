@@ -122,7 +122,8 @@ if (requireTrigger) {
       })
       .join("\n");
     triggerSourceOk = /\bgenerateText\s*\(/.test(source) &&
-      /@ai-sdk\/anthropic/.test(source) &&
+      /@ai-sdk\/openai/.test(source) &&
+      /reasoningEffort\s*:\s*["']high["']/.test(source) &&
       /\bbatchTriggerAndWait\s*\(/.test(source) &&
       /fa-fanout-audit/.test(source) &&
       /fa-audit-route/.test(source);

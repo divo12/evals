@@ -9,6 +9,10 @@ You must implement the train as a Trigger.dev project. A worker is already
 running `trigger dev` against `/app/orchestrator`. Do not start `trigger dev`
 yourself. Do not run `trigger deploy`.
 
+Load `$trigger-authoring-tasks` before writing the workflow. Its full
+version-pinned reference is available at
+`/app/orchestrator/node_modules/@trigger.dev/sdk/skills/trigger-authoring-tasks/SKILL.md`.
+
 Nobody will be at the keyboard after you start. The whole train must complete
 without a human relaunching, re-prompting, or resuming anything. Grading uses the
 world's ledger, not what you say you did.

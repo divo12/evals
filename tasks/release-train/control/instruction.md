@@ -18,8 +18,8 @@ It is at `$WORLD_URL` (in this environment: `http://world:4747`).
 Announce yourself once at the very start and once at the end:
 
 ```
-POST /run/start   { "arm": "claude", "note": "free text" }
-POST /run/finish  { "arm": "claude", "summary": {...} }
+POST /run/start   { "arm": "codex", "note": "free text" }
+POST /run/finish  { "arm": "codex", "summary": {...} }
 ```
 
 Every additional `POST /run/start` is a human relaunch and fails the task.
@@ -85,9 +85,10 @@ POST /notify  { "channel": "releases", "text": "...", "data": { "patched": [...]
 5. Exactly the follow-up window after the **last promotion**, re-read every service's state and post exactly one message to `releases` with `data.patched` and `data.rolledBack` listing service names. Not earlier, not twice.
 6. Zero human relaunches.
 
-Use Claude Code's native `Workflow` tool to author and run the dynamic workflow
-for the service migration and verification work. Keep the long waits and world
-side effects in this ultracode session; write helper scripts under `/app` if
-needed. Stay until the train is finished. Do not hand the work to Trigger.dev
-or another worker platform. The world's callbacks are ordinary HTTP POSTs to
-any URL you give it.
+Use `$codex-dynamic-workflows` to plan and run the service migration and
+verification as a dynamic Codex subagent workflow. You are authorized to
+create workflow artifacts under `/app/.workflow` and spawn up to 12 subagents
+with at most 4 running at once. Keep long waits and world side effects in this
+Codex session; write helper scripts under `/app` if needed. Stay until the train
+finishes. Do not hand the work to Trigger.dev or another worker platform. The
+world's callbacks are ordinary HTTP POSTs to any URL you give it.

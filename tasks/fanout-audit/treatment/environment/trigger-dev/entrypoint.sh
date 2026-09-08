@@ -11,8 +11,8 @@ if [ -z "${TRIGGER_ACCESS_TOKEN:-}" ]; then
   echo "trigger-dev: missing TRIGGER_ACCESS_TOKEN (needs tr_pat_ for trigger dev)" >&2
   exit 1
 fi
-if [ -z "${ANTHROPIC_API_KEY:-}" ] || [ -z "${ANTHROPIC_MODEL:-}" ]; then
-  echo "trigger-dev: missing ANTHROPIC_API_KEY or ANTHROPIC_MODEL" >&2
+if [ -z "${OPENAI_API_KEY:-}" ] || [ "${OPENAI_MODEL:-}" != "gpt-5.6-sol" ]; then
+  echo "trigger-dev: OPENAI_API_KEY and OPENAI_MODEL=gpt-5.6-sol are required" >&2
   exit 1
 fi
 cat > /app/orchestrator/trigger.config.ts <<EOF
@@ -31,6 +31,6 @@ export default defineConfig({
   },
 });
 EOF
-echo "trigger-dev: key_set=${TRIGGER_SECRET_KEY:+yes} ref_set=${TRIGGER_PROJECT_REF:+yes} model_set=${ANTHROPIC_MODEL:+yes}"
+echo "trigger-dev: key_set=${TRIGGER_SECRET_KEY:+yes} ref_set=${TRIGGER_PROJECT_REF:+yes} model=${OPENAI_MODEL}"
 cd /app/orchestrator
 exec trigger dev --skip-telemetry

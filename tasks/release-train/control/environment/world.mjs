@@ -83,7 +83,8 @@ async function callback(cb, body) {
       headers: { "content-type": "application/json", ...(cb.headers ?? {}) },
       body: JSON.stringify(body),
     });
-    ledger("callback", { url: cb.url, status: res.status, ...body });
+    const { status: eventStatus, ...event } = body;
+    ledger("callback", { url: cb.url, httpStatus: res.status, eventStatus, ...event });
     if (!res.ok) throw new Error(`callback ${res.status}`);
   };
   for (let i = 0; i < 5; i++) {

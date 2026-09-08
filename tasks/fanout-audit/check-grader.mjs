@@ -41,7 +41,7 @@ function grade(name, { ledger = [trackerStart, ...ticketRows, ...ciRows], candid
   if (requireTrigger) {
     const orchestrator = join(dir, "orchestrator");
     mkdirSync(orchestrator);
-    writeFileSync(join(orchestrator, "tasks.ts"), 'import "@ai-sdk/anthropic"; generateText(); batchTriggerAndWait(); // fa-fanout-audit fa-audit-route\n');
+    writeFileSync(join(orchestrator, "tasks.ts"), 'import "@ai-sdk/openai"; generateText({ providerOptions: { openai: { reasoningEffort: "high" } } }); batchTriggerAndWait(); // fa-fanout-audit fa-audit-route\n');
     args.push("--require-trigger", "--orchestrator-dir", orchestrator);
     if (triggerEvidence) {
       writeFileSync(join(dir, "trigger.json"), JSON.stringify(triggerEvidence));

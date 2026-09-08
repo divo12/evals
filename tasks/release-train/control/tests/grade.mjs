@@ -124,7 +124,7 @@ const finishes = of("run.finish");
 check("run finished exactly once after the follow-up", finishes.length === 1 && note && finishes[0].t >= note.t, finishes.length);
 
 if (requireTrigger) {
-  const callbacks = of("callback").filter((r) => r.status >= 200 && r.status < 300 && isTriggerWaitUrl(r.url));
+  const callbacks = of("callback").filter((r) => r.httpStatus >= 200 && r.httpStatus < 300 && isTriggerWaitUrl(r.url));
   const ciCallbacks = callbacks.filter((r) => r.event === "ci.finished");
   const approvalCallbacks = callbacks.filter((r) => r.event === "approval.decided");
   check("every CI request used a Trigger wait token", of("ci.request").every((r) => r.callback) &&

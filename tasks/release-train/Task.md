@@ -18,8 +18,8 @@ Two Harbor packages, one world, one ledger:
 
 - Work the agent must accomplish: migrate 12 services off a vulnerable library, pass real CI, wait for delayed per-batch approvals, canary, roll back services that degrade, promote the rest, then post one follow-up after a delay.
 - Capability being tested:
-  - Control: Claude in ultracode mode authors and runs a native dynamic `Workflow`; the session remains the runtime for waits and side effects.
-  - Treatment: the same Claude setup authors and runs a Trigger.dev dynamic workflow. Waits must be `wait.forToken` / `wait.for` / `wait.until`, not an in-session poll loop.
+  - Control: Codex uses `$codex-dynamic-workflows` to plan and run a native subagent workflow; the Codex session remains the runtime for waits and side effects.
+  - Treatment: the same Codex configuration authors and runs a Trigger.dev workflow. Waits must be `wait.forToken` / `wait.for` / `wait.until`, not an in-session poll loop.
 - Why this case matters: Scenario 5's no-fault long-wait baseline. Same world and grader; only the orchestrator changes.
 - Repository, trace, existing Task, or human evidence: naive reference `control/solution/reference-naive.mjs` passed Harbor Oracle on this world; sidecar `treatment/environment/trigger-dev`; world logs `callback.url`.
 - Difference from existing Tasks: one family with two Harbor packages.
@@ -30,15 +30,17 @@ Two Harbor packages, one world, one ledger:
 - Later user turns or event input, if any: none. Operator SIGKILL of `main` is outside the default Harbor trial.
 - Context supplied outside the instruction:
   - Both: `RELEASE.md`, `services/`, `vendor/` generated into `/app`; `WORLD_URL=http://world:4747`.
+  - Control only: `codex-dynamic-workflows` supplied through Harbor `--skill`.
   - Treatment only: seeded `/app/orchestrator`; `TRIGGER_SECRET_KEY`, `TRIGGER_ACCESS_TOKEN` (`tr_pat_…`), and `TRIGGER_PROJECT_REF`.
+  - Treatment only: official `trigger-authoring-tasks` supplied through Harbor `--skill`; full SDK 4.5.16 reference under `/app/orchestrator/node_modules`.
 
 ## Relevant agent conditions
 
-- Both arms use the same resolved Claude author model, ultracode effort, tool configuration, and authoring budget.
-- Control: a native `Workflow` must perform the service migration/verification decomposition; long waits remain in-process. A retained trajectory without that substantive Workflow call is an invalid arm assignment.
-- Treatment: author Trigger tasks, start one run, then idle. Harbor grades when the agent exits, so `main` must outlast the workflow even though the worker does the waits. Seeded `trigger.config.ts` disables default retries (`enabledInDev: false`) because a parent retry after `/run/start` is a relaunch.
+- Both arms use Codex with `gpt-5.6-sol`, high reasoning effort, host ChatGPT authentication forwarded by `CODEX_FORCE_AUTH_JSON=1`, the same tool configuration, and the same authoring budget.
+- Control: `$codex-dynamic-workflows` and native Codex subagents must perform the service migration/verification decomposition; long waits remain in-process. A trajectory without the skill and substantive subagent work is an invalid arm assignment.
+- Treatment: load `trigger-authoring-tasks`, author Trigger tasks, start one run, then idle. Harbor grades when the agent exits, so `main` must outlast the workflow even though the worker does the waits. Seeded `trigger.config.ts` disables default retries (`enabledInDev: false`) because a parent retry after `/run/start` is a relaunch.
 - Tools: HTTP to `world:4747`; filesystem under `/app`. Treatment also uses the sidecar worker and Trigger Cloud.
-- Material differences from normal operation: default `PROFILE=smoke`. `PROFILE=compressed` / `real` need a larger `[agent].timeout_sec`. Default Harbor does not SIGKILL `main`, so this package alone makes no crash-recovery claim.
+- Material differences from normal operation: default `PROFILE=smoke`; both arms allow 20 minutes for Codex authoring plus the timed workflow. `PROFILE=compressed` / `real` need a larger `[agent].timeout_sec`. Default Harbor does not SIGKILL `main`, so this package alone makes no crash-recovery claim.
 - Credentials: none on control. Treatment needs `TRIGGER_SECRET_KEY` (`tr_dev_…`), `TRIGGER_ACCESS_TOKEN` (`tr_pat_…` for `trigger dev`), and `TRIGGER_PROJECT_REF` from operator `.env`. Do not set `TRIGGER_ACCESS_TOKEN` to the project secret. `VERIFIER_TOKEN` is verifier-only.
 
 ## Environment
@@ -82,10 +84,10 @@ Treatment only (`grade.mjs --require-trigger`):
 | trigger_approval | every approval resumes a Trigger wait | ledger `callback` | matching approval id, HTTP 2xx, hostname `*.trigger.dev` | all approvals |
 | no_polling | no CI or approval polling | ledger | poll counts | zero |
 
-- Control accepted alternatives: any native Workflow decomposition for migration and verification, with session-local wait/deploy logic. Trigger is not provided.
+- Control accepted alternatives: any `$codex-dynamic-workflows` decomposition for migration and verification, with session-local wait/deploy logic. Trigger is not provided.
 - Treatment accepted alternatives: any Trigger task graph that uses wait tokens for CI and approvals. A polling loop that finishes the ledger still fails the Trigger rows.
 - Complete pass rule: listed rows for that arm AND relaunches == 0. Reward 1 or 0.
-- Invalid-run conditions: world unhealthy; protected CI or ledger unavailable; missing substantive Workflow use in control; treatment missing Trigger keys; mismatched author model, effort, tools, or budget.
+- Invalid-run conditions: world unhealthy; protected CI or ledger unavailable; missing control skill/subagent use; missing treatment Trigger skill or keys; mismatched author model, reasoning, tools, or budget.
 
 ## Fairness and leakage
 
@@ -99,6 +101,28 @@ Treatment only (`grade.mjs --require-trigger`):
 ## Open decisions
 
 - Human decisions: Draft. Audit fixes implemented; changed scoring and protected CI behavior await review.
-- Run plan: `harbor run -p tasks/release-train/control -a oracle -e docker -n 1`. Treatment: `harbor run -p tasks/release-train/treatment -a oracle --env-file .env -e docker -n 1`. Updated control Oracle passed (`jobs/fixed-release-control-oracle`). Model trials not authorized.
+- Run plan executed: one Oracle and one `gpt-5.6-sol` high-reasoning Codex trial per arm; no judge; 1200s agent timeout.
 - Assumptions: Harbor grades when the agent exits; `world` hostname works; treatment `world` has egress to `api.trigger.dev`.
 - Remaining questions: add a separately specified orchestrator-kill variant with an automatic resume policy; whether `PROFILE=compressed` should be the default scored timeout.
+
+## Calibration evidence
+
+- Oracle control: `jobs/codex-release-oracle-control`, reward 1, no exception.
+- Oracle treatment: `jobs/codex-release-oracle-treatment-fixed`, reward 1,
+  19 successful Trigger callbacks, zero CI/approval polls, no exception.
+- Codex control: `jobs/codex-release-train-control-20260908T101855Z`, reward
+  1, no exception, 826s total, 150,582 input / 131,968 cached / 2,266 output
+  tokens, $0.1725632 recorded cost. The skill created workflow artifacts and
+  three native batch-migration subagents. World ledger span: 594s.
+- Codex treatment: `jobs/codex-release-treatment-1200s`, reward 1, no
+  exception, 1,037s total, 2,265,988 input / 2,185,088 cached / 16,040 output
+  tokens, $1.5184352 recorded cost. Codex loaded the pinned Trigger skill,
+  authored one Trigger run, used 19 callbacks, and made zero CI/approval polls.
+  World ledger span: 462s.
+- Invalid setup evidence: `jobs/codex-release-train-control-20260908T101210Z`
+  used Harbor's empty API-key fallback and failed 401 before agent work.
+  `jobs/codex-release-train-treatment-20260908T101855Z` reached reward 1 but
+  hit the old 900s agent timeout before clean exit. Neither is scored.
+- One trial per arm establishes reachability, not a stable performance ranking.
+  Total Harbor runtime is comparable; world-ledger span is not an authoring
+  metric because the arms post `/run/start` at different stages.

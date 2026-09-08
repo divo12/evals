@@ -4,7 +4,7 @@ artifacts = []
 [task]
 name = "evals/fanout-audit-control"
 version = "1.0.0"
-description = "Control: ultracode authors a native dynamic Workflow for the fan-out auth audit."
+description = "Control: Codex uses the dynamic-workflow skill and native subagents for the fan-out auth audit."
 authors = []
 keywords = ["fan-out", "subagents", "harbor", "control"]
 

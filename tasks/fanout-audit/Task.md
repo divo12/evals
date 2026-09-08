@@ -18,10 +18,10 @@ Two Harbor packages, one tracker, one planted set:
 
 - Work the agent must accomplish: audit every route under `src/routes/` for missing `requireAuth`, independently confirm each finding, file one tracker ticket per confirmed route, retry flaky CI, write `report.json`.
 - Capability being tested:
-  - Control: Claude Code writes and runs a native `Workflow` fan-out. The session is the runtime.
-  - Treatment: Claude writes a Trigger.dev parent that `batchTriggerAndWait`s Claude child tasks. Each child calls the same model release used by the control arm.
+  - Control: Codex uses `$codex-dynamic-workflows` to plan and run a native subagent fan-out. The Codex session is the runtime.
+  - Treatment: the same Codex configuration writes a Trigger.dev parent that `batchTriggerAndWait`s GPT-5.6 Sol child tasks.
 - Why this case matters: Scenario 5 agent/subagent comparison. Same files and grader; only the substrate changes. `release-train` already covers long waits.
-- Repository, trace, existing Task, or human evidence: recovered generator/tracker/grader from the retired `ultracode-auth-audit` package (`42fbc07`); Claude workflow docs (`agent` + `pipeline`); Trigger `batchTriggerAndWait` + child model calls.
+- Repository, trace, existing Task, or human evidence: recovered generator/tracker/grader from the retired `ultracode-auth-audit` package (`42fbc07`); `codex-dynamic-workflows` revision `ae9af55`; Trigger `batchTriggerAndWait` + child model calls.
 - Difference from existing Tasks: fan-out of LLM workers, not timed canaries. Family layout matches `tasks/release-train`.
 
 ## Agent input
@@ -30,16 +30,17 @@ Two Harbor packages, one tracker, one planted set:
 - Later user turns or event input, if any: none.
 - Context supplied outside the instruction:
   - Both: generated `/app` API repo; `TRACKER_URL=http://tracker:9410`; `CI_SECONDS`.
-  - Treatment only: seeded `/app/orchestrator`; Trigger keys in `main`; `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` on the worker only.
+  - Control only: `codex-dynamic-workflows` supplied through Harbor's `--skill` option.
+  - Treatment only: seeded `/app/orchestrator`; Trigger keys in `main`; `OPENAI_API_KEY` and `OPENAI_MODEL` on the worker only.
 
 ## Relevant agent conditions
 
-- Both arms use the same resolved Claude author model, ultracode effort, tool configuration, and authoring budget.
-- Control: use the native `Workflow` tool and stay in `main` until CI is green. A retained trajectory without a `Workflow` call is an invalid arm assignment.
+- Both arms use Codex with `gpt-5.6-sol`, high reasoning effort, host ChatGPT authentication forwarded by `CODEX_FORCE_AUTH_JSON=1`, the same tool configuration, and the same authoring budget.
+- Control: use `$codex-dynamic-workflows` and native Codex subagents; stay in `main` until CI is green. A trajectory without the skill and subagent work is an invalid arm assignment.
 - Treatment: author parent `fa-fanout-audit` plus child `fa-audit-route`, trigger once, and idle until done. Harbor grades when the agent exits.
 - Tools: filesystem under `/app`; `POST $TRACKER_URL/tickets`; `./scripts/ci.sh`. Treatment also uses the sidecar worker and a model API from child runs.
 - Material differences: smoke is 16 routes / 4 planted. Raise `ROUTE_COUNT` / `PLANTED` and `[agent].timeout_sec` for a larger fan-out.
-- Credentials: none on control. Treatment needs Trigger keys plus `ANTHROPIC_API_KEY`; `ANTHROPIC_MODEL` must identify the same Claude release resolved for the control arm. `VERIFIER_TOKEN` is verifier-only.
+- Credentials: none on control beyond Codex authentication. Treatment needs Trigger keys plus `OPENAI_API_KEY`; `OPENAI_MODEL` is fixed to `gpt-5.6-sol`. `VERIFIER_TOKEN` is verifier-only.
 - This package is the no-fault authoring and execution baseline. It does not measure crash recovery until a fault driver and resume policy are added.
 
 ## Environment
@@ -47,10 +48,10 @@ Two Harbor packages, one tracker, one planted set:
 - Starting state: seed 42, 16 route files, 4 planted missing `requireAuth` (names only in `tests/fixtures/oracle.json`). Four public exceptions are present. Valid authenticated routes use both direct `requireAuth` and the project `secure` wrapper; planted files contain misleading `requireAuth` comments.
 - Agent-visible: `/app/src/routes`, `/app/README.md`, `/app/scripts/ci.sh`. `SEED` / `ROUTE_COUNT` / `PLANTED` stay on the tracker compose service only.
 - Hidden: planted list, tracker ledger, `/internal/ledger`, this `Task.md`, `tests/`, `solution/`, and `generate.mjs` (tracker image only).
-- Simulated tracker with a ledger-backed flaky CI endpoint. Treatment: live Trigger Cloud + live Claude API from the sidecar.
+- Simulated tracker with a ledger-backed flaky CI endpoint. Treatment: live Trigger Cloud + live OpenAI API from the sidecar.
 - Setup: tracker generates `/app` onto the shared volume (does not wipe `/app/orchestrator`), then serves tickets. `main` waits for `/app/src/app.ts`. Fresh compose per trial.
 - World Skill: `.agents/skills/evals-world/SKILL.md` (unreviewed).
-- Production differences: planted bugs; 12s CI; child model is the explicitly configured `ANTHROPIC_MODEL`.
+- Production differences: planted bugs; 12s CI; child model is the explicitly configured `OPENAI_MODEL`.
 
 ## Verification
 
@@ -69,12 +70,12 @@ Treatment only (`grade.mjs --require-trigger`):
 | ID | Required or prohibited result | Independent evidence | Exact check | Pass |
 |---|---|---|---|---|
 | trigger_runs | every ticket maps to a fresh completed `fa-audit-route` child under one `fa-fanout-audit` root | Trigger Run API + ledger | run status, task ids, payload, output, root id, trial timestamps | all tickets |
-| trigger_source | submitted project contains Claude calls and concurrent batch triggering | post-run source | required SDK calls and task ids | required |
+| trigger_source | submitted project contains GPT-5.6 Sol calls with high reasoning and concurrent batch triggering | post-run source | required SDK calls, reasoning setting, task ids | required |
 
-- Control accepted alternatives: any native Workflow decomposition that audits and verifies every route. Trigger is not provided.
-- Treatment accepted alternatives: one or more concurrent `batchTriggerAndWait` calls. Each child must call Claude. A parent regex loop with invented run ids fails the Trigger evidence check.
+- Control accepted alternatives: any `$codex-dynamic-workflows` decomposition that audits and verifies every route through Codex subagents. Trigger is not provided.
+- Treatment accepted alternatives: one or more concurrent `batchTriggerAndWait` calls. Each child must call GPT-5.6 Sol at high reasoning. A parent regex loop with invented run ids fails the Trigger evidence check.
 - Complete pass rule: listed rows for that arm. Reward 1 or 0.
-- Invalid-run conditions: tracker or verifier evidence unavailable; treatment missing Trigger/model keys; Trigger Run API unavailable; wrong control Harness or mismatched child model.
+- Invalid-run conditions: tracker or verifier evidence unavailable; treatment missing Trigger/model keys; Trigger Run API unavailable; missing control skill/subagents; author or child model/reasoning mismatch.
 
 ## Fairness and leakage
 
@@ -89,5 +90,5 @@ Treatment only (`grade.mjs --require-trigger`):
 
 - Human decisions: Draft. Audit fixes implemented; changed scoring and environment behavior await review.
 - Run plan: `harbor run -p tasks/fanout-audit/control -a oracle -e docker -n 1`. Treatment: `harbor run -p tasks/fanout-audit/treatment -a oracle --env-file .env -e docker -n 1`. Updated control Oracle passed (`jobs/fixed-fanout-control-oracle-v2`). Model trials not authorized.
-- Assumptions: Harbor grades when the agent exits; child tasks can read `/app` via the shared volume; `ANTHROPIC_MODEL` matches the resolved control child model release.
+- Assumptions: Harbor grades when the agent exits; child tasks can read `/app` via the shared volume; OpenAI API access includes `gpt-5.6-sol`.
 - Remaining questions: add a separately specified late-child-failure variant with automatic resume; capture trusted model-token usage for cost and rework metrics.
