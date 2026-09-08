@@ -13,7 +13,8 @@ const rejected = [];
 for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
   const name = file.replace(/\.ts$/, "");
   const src = readFileSync(join(dir, file), "utf8");
-  const missing = !src.includes("requireAuth");
+  const handler = src.match(/export const handler[^=]*=\s*([^\n]+)/)?.[1] ?? "";
+  const missing = !/\b(requireAuth|secure)\s*\(/.test(handler);
   if (publicRoutes.has(name)) {
     if (missing) rejected.push(name);
     continue;

@@ -83,7 +83,7 @@ async function callback(cb, body) {
       headers: { "content-type": "application/json", ...(cb.headers ?? {}) },
       body: JSON.stringify(body),
     });
-    ledger("callback", { url: cb.url, status: res.status, event: body.event });
+    ledger("callback", { url: cb.url, status: res.status, ...body });
     if (!res.ok) throw new Error(`callback ${res.status}`);
   };
   for (let i = 0; i < 5; i++) {
@@ -99,8 +99,18 @@ async function callback(cb, body) {
 // ---------------------------------------------------------------------------
 function runCheck(service) {
   return new Promise((resolve) => {
-    const dir = join(workspace, "services", service);
-    const child = spawn(process.execPath, ["check.mjs"], { cwd: dir });
+    const serviceDir = join(workspace, "services", service);
+    const vendorDir = join(workspace, "vendor/acme-utils-2.0.0");
+    const child = spawn(process.execPath, [
+      "--experimental-permission",
+      `--allow-fs-read=${serviceDir}`,
+      `--allow-fs-read=${vendorDir}`,
+      "--allow-fs-read=/opt/world/protected-check.mjs",
+      "/opt/world/protected-check.mjs",
+      serviceDir,
+      JSON.stringify(oracle.featuresByService?.[service] ?? []),
+      oracle.vendor2Hash,
+    ], { cwd: serviceDir, env: { PATH: process.env.PATH ?? "" } });
     let out = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (out += d));

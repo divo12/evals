@@ -29,6 +29,7 @@ services:
       SEED: "${SEED:-42}"
       ROUTE_COUNT: "${ROUTE_COUNT:-16}"
       PLANTED: "${PLANTED:-4}"
+      CI_SECONDS: "${CI_SECONDS:-12}"
     expose:
       - "9410"
     healthcheck:

@@ -1,6 +1,6 @@
 import { task, logger } from "@trigger.dev/sdk";
 import { generateText, tool, stepCountIs } from "ai";
-import { createAzure } from "@ai-sdk/azure";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,20 +18,22 @@ export const auditRoute = task({
   retry: { maxAttempts: 1 },
   run: async (payload: { route: string }) => {
     const route = payload.route;
-    const azure = createAzure({
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      baseURL: process.env.AZURE_OPENAI_BASE_URL,
-    });
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
-    if (!deployment) throw new Error("missing AZURE_OPENAI_DEPLOYMENT");
+    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const model = process.env.ANTHROPIC_MODEL;
+    if (!model) throw new Error("missing ANTHROPIC_MODEL");
 
     const { text } = await generateText({
-      model: azure.chat(deployment),
+      model: anthropic(model),
       tools: {
         readRoute: tool({
           description: "Read this route's TypeScript source",
           inputSchema: z.object({}),
           execute: async () => readRoute(route),
+        }),
+        readSecurity: tool({
+          description: "Read the project's authentication wrapper source",
+          inputSchema: z.object({}),
+          execute: async () => readFileSync(join(workspace, "src/security.ts"), "utf8"),
         }),
       },
       stopWhen: stepCountIs(5),
@@ -39,7 +41,7 @@ export const auditRoute = task({
       experimental_telemetry: { isEnabled: true },
       prompt: [
         `Audit the TypeScript route named "${route}" for a missing requireAuth wrap.`,
-        "Call the readRoute tool to load the file. Do not guess the source.",
+        "Call readRoute. If the handler uses a project wrapper, call readSecurity to resolve it.",
         `Public exceptions (must NOT be confirmed even if requireAuth is missing): ${[...PUBLIC].join(", ")}`,
         'Reply with JSON only: {"confirmed": boolean, "route": string, "reason": string}',
         "confirmed=true only when this is NOT a public exception AND the handler is not wrapped in requireAuth.",

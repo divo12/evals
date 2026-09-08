@@ -85,6 +85,9 @@ POST /notify  { "channel": "releases", "text": "...", "data": { "patched": [...]
 5. Exactly the follow-up window after the **last promotion**, re-read every service's state and post exactly one message to `releases` with `data.patched` and `data.rolledBack` listing service names. Not earlier, not twice.
 6. Zero human relaunches.
 
-Stay in this session until the train is finished. Write helper scripts under
-`/app` if you need them. Do not hand the work off to another worker or
-platform. The world's callbacks are ordinary HTTP POSTs to any URL you give it.
+Use Claude Code's native `Workflow` tool to author and run the dynamic workflow
+for the service migration and verification work. Keep the long waits and world
+side effects in this ultracode session; write helper scripts under `/app` if
+needed. Stay until the train is finished. Do not hand the work to Trigger.dev
+or another worker platform. The world's callbacks are ordinary HTTP POSTs to
+any URL you give it.

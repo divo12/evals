@@ -12,7 +12,8 @@
  *   workspace/RELEASE.md                 batches + policy the agent must follow
  *   environment/oracle.json              hidden: which services degrade on canary, which CI runs flake
  */
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -288,9 +289,13 @@ Endpoints, windows, and payloads are at $WORLD_URL (default http://world:4747 in
 );
 
 mkdirSync(dirname(oracleOut), { recursive: true });
+const vendor2Hash = createHash("sha256")
+  .update(readFileSync(join(workspace, "vendor/acme-utils-2.0.0/index.js")))
+  .update(readFileSync(join(workspace, "vendor/acme-utils-2.0.0/package.json")))
+  .digest("hex");
 writeFileSync(
   oracleOut,
-  JSON.stringify({ seed, services: names, batches, degrade, flaky }, null, 2) + "\n",
+  JSON.stringify({ seed, services: names, featuresByService: Object.fromEntries(services.map((s) => [s.name, s.features])), vendor2Hash, batches, degrade, flaky }, null, 2) + "\n",
 );
 
 writeFileSync(join(workspace, ".gitignore"), "node_modules\n");

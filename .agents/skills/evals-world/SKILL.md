@@ -28,25 +28,25 @@ This skill is an **unreviewed** bootstrap. Do not treat it as human-approved.
 | Harbor package shape | `tasks/release-train/control/task.toml` | schema_version 1.4 example used in this repo |
 | Sidecar world + shared workspace volume | `tasks/release-train/control/environment/docker-compose.yaml` | agent edits `/app`; sidecar acts on those files |
 | Generate-on-volume without leaking the generator | `tasks/fanout-audit/control/environment/Dockerfile.tracker` | generate lives on the sidecar image, not `main` |
-| Trigger worker that survives the agent | `tasks/release-train/treatment/environment/trigger-dev/` | seeded project + `trigger dev`; cloud keys |
+| Trigger worker isolated from `main` | `tasks/release-train/treatment/environment/trigger-dev/` | seeded project + `trigger dev`; cloud keys |
 | Hidden oracle | `tests/fixtures/oracle.json` in each Harbor package | never COPY into the `main` image |
 | Ledger grading | `GET /internal/ledger` with `[verifier.env].VERIFIER_TOKEN` | 404 without the bearer token |
-| Independent Trigger evidence | ledger `callback.url` or `triggerRunId` | release-train: `*.trigger.dev` + HTTP 2xx; fanout-audit: `^run_` on every ticket |
+| Independent Trigger evidence | ledger callbacks or Trigger Run API | release-train: matching wait-token callbacks; fanout-audit: completed child/root hierarchy |
+| Protected code checks | `tasks/release-train/*/environment/protected-check.mjs` | ignores agent-editable `check.mjs` and restricts filesystem access |
 
 ## Task Spec guidance
 
 Each comparison is one family with two Harbor packages:
 
-- **Control** — session-bound. Compose is `main` plus one sidecar (`world` or `tracker`). No Trigger keys.
-- **Treatment** — agent writes Trigger tasks. Compose adds `trigger-dev`. Same ledger rows, plus `--require-trigger`.
+- **Control** — Claude Code ultracode authors and runs a native dynamic Workflow. Compose is `main` plus one sidecar (`world` or `tracker`). No Trigger keys. Require substantive Workflow use in the retained trajectory.
+- **Treatment** — the same Claude author setup writes Trigger tasks. Compose adds `trigger-dev`. Same ledger rows, plus `--require-trigger`.
 
 Keep the two worlds identical except compose sidecar, instruction, and the
 verifier flag. Copy generators, sidecars, and `grade.mjs` rather than forking
 behavior.
 
 Harbor grades when the agent exits. Both arms must keep `main` alive until the
-work finishes. SIGKILL of `main` is operator-injected, not the default Harbor
-Oracle.
+work finishes. Current packages do not inject process faults.
 
 Do not store planted route lists or degrade-service names here.
 
@@ -75,21 +75,27 @@ Do not store planted route lists or degrade-service names here.
   (`tr_pat_…`). `TRIGGER_SECRET_KEY` (`tr_dev_…`) is only for the SDK / REST
   trigger API. Never set `TRIGGER_ACCESS_TOKEN` from the project secret — the
   CLI then refuses to start and Cloud runs sit in `PENDING_VERSION`.
-- Also pass `TRIGGER_PROJECT_REF`. Fan-out children that call a model also
-  need `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASE_URL`, and
-  `AZURE_OPENAI_DEPLOYMENT` on the sidecar.
+- Also pass `TRIGGER_PROJECT_REF`. Fan-out children use `ANTHROPIC_API_KEY`
+  and `ANTHROPIC_MODEL` only on the Trigger sidecar. Match that model to the
+  control Workflow's resolved Claude release before paired runs.
 
 ## Verification guidance
 
-- Verifier copies `tests/` to `/tests` after the agent. `test.sh` must always
-  write `/logs/verifier/reward.txt`.
+- Verifier copies `tests/` to `/tests` after the agent. Agent failures write a
+  reward; missing or corrupt independent evidence exits as infrastructure error
+  without writing an agent score.
 - Independent truth is the sidecar ledger plus `tests/fixtures/oracle.json`.
 - Do not put `VERIFIER_TOKEN` in `[environment.env]` (agent-visible).
 - Do not put generator knobs (`SEED`, `ROUTE_COUNT`, `PLANTED`) in
   `[environment.env]`. Keep them on the sidecar compose service only.
 - Treatment: `grade.mjs --require-trigger`. Control must not pass that flag.
-- `--require-trigger` is family-specific: release-train checks callback
-  hostnames; fanout-audit checks ledger `triggerRunId` matches `^run_`.
+- Release treatment matches every CI/approval result to a successful Trigger
+  wait-token callback and rejects polling. Fanout treatment retrieves each
+  claimed child through the Trigger Run API and checks status, task ids,
+  payload, output, common root, and creation time against the tracker-start
+  timestamp so old runs cannot be replayed.
+- Fanout CI success comes from tracker ledger events; files inside `/app` are
+  not trusted as CI evidence.
 
 ## Run and audit guidance
 
@@ -111,12 +117,16 @@ without an explicit run plan.
 
 ## Known limits and open questions
 
-- Harbor Oracle path does not inject SIGKILL/sleep faults; those remain operator-driven.
+- Current packages are no-fault baselines. They do not support durability
+  claims until a fault driver and automatic resume policy are implemented.
+- `trigger dev` executes tasks locally and is not evidence of production
+  deployment durability.
 - Cloud Harbor backends that cannot run compose will not hide sidecar oracles; Dockerfile-only packing would leak `/hidden` into `main`.
-- Treatment arms have no `solution/solve.sh`.
-- Fanout treatment `--require-trigger` checks a `run_` prefix, not Cloud membership.
-- `test.sh` writes reward `0` when the ledger fetch fails. That is an infra miss scored as a failed agent, same as release-train.
-- Fanout-audit control Oracle (`jobs/2026-09-07__23-24-47`) proved: tracker generate-then-healthcheck, two CI attempts (12s flake then pass), ledger recall/precision/tickets, `requireTrigger=false`.
+- Fanout-audit control Oracle (`jobs/fixed-fanout-control-oracle-v2`) proves the
+  updated tracker-backed CI, complete report partition, exact tickets, and
+  shared grader; it passed all rows with two CI attempts.
+- Release-train control Oracle (`jobs/fixed-release-control-oracle`) proves the
+  protected CI runner and expanded ledger checks; it passed all rows in 333s.
 - World skill has not been human-reviewed.
 
 ## Update this skill

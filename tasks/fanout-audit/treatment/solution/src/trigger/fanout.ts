@@ -16,25 +16,29 @@ export const fanoutAudit = task({
       .filter((f) => f.endsWith(".ts"))
       .map((f) => f.replace(/\.ts$/, ""));
 
-    // Sequential children: trigger dev often loses executors on a 16-way batch.
     const findings: { confirmed: boolean; route: string; reason: string; runId: string }[] = [];
-    for (const route of files) {
-      let run: Awaited<ReturnType<typeof auditRoute.triggerAndWait>> | undefined;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        run = await auditRoute.triggerAndWait({ route });
-        if (run.ok) break;
+    let pending = files;
+    for (let attempt = 0; attempt < 5 && pending.length; attempt++) {
+      const inputs = pending;
+      const batch = await auditRoute.batchTriggerAndWait(inputs.map((route) => ({ payload: { route } })));
+      pending = [];
+      for (const [index, run] of batch.runs.entries()) {
+        if (!run.ok) {
+          pending.push(inputs[index]);
+          continue;
+        }
+        findings.push({
+          confirmed: run.output.confirmed,
+          route: run.output.route,
+          reason: run.output.reason,
+          runId: run.id,
+        });
+      }
+      if (pending.length) {
         await wait.for({ seconds: 8 });
       }
-      if (!run?.ok) {
-        throw new Error(`child failed ${route} ${JSON.stringify(run?.error ?? run)}`);
-      }
-      findings.push({
-        confirmed: run.output.confirmed,
-        route: run.output.route,
-        reason: run.output.reason,
-        runId: run.id,
-      });
     }
+    if (pending.length) throw new Error(`children failed after retries: ${pending.join(", ")}`);
 
     const confirmed = findings.filter((f) => f.confirmed).map((f) => f.route);
     const rejected = findings.filter((f) => !f.confirmed).map((f) => f.route);

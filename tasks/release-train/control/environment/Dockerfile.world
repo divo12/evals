@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/world
-COPY generate.mjs world.mjs entrypoint.sh /opt/world/
+COPY generate.mjs world.mjs protected-check.mjs entrypoint.sh /opt/world/
 RUN chmod +x /opt/world/entrypoint.sh && mkdir -p /hidden
 
 ENV WORKSPACE=/app

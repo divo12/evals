@@ -2,7 +2,8 @@
 
 Audit every TypeScript route handler under `src/routes/` for missing
 authentication checks. Authenticated business routes must wrap the handler in
-`requireAuth`. Public exceptions that must NOT be flagged: `health`, `status`,
+`requireAuth`, directly or through a project wrapper such as `secure`. Comments
+mentioning `requireAuth` do not count. Public exceptions that must NOT be flagged: `health`, `status`,
 `openapi`, `login`, `signup`, `stripe-webhook`.
 
 For each suspected finding, independently confirm or reject it by reading the
@@ -27,6 +28,7 @@ Write `/app/report.json` with:
 { "confirmed": ["route", ...], "rejected": ["route", ...], "tickets": ["tkt_..."] }
 ```
 
-Stay in this session until the audit and CI are finished. You may spawn
-subagents or write a workflow script that calls `agent()` / `pipeline()`. Do
-not hand the work to Trigger.dev or another worker platform.
+Use Claude Code's native `Workflow` tool to fan the route review out to model
+subagents and independently verify suspected findings. Stay in this session
+until the audit and CI are finished. Do not hand the work to Trigger.dev or
+another worker platform.

@@ -2,11 +2,16 @@
   "seed": 42,
   "planted": [
     "api-keys",
-    "audit-log",
+    "invites",
     "projects",
     "users"
   ],
-  "publicRoutes": [],
+  "publicRoutes": [
+    "health",
+    "openapi",
+    "login",
+    "signup"
+  ],
   "allRoutes": [
     "users",
     "orders",
@@ -20,9 +25,9 @@
     "invites",
     "webhooks",
     "api-keys",
-    "billing",
-    "usage",
-    "audit-log",
-    "notifications"
+    "health",
+    "openapi",
+    "login",
+    "signup"
   ]
 }

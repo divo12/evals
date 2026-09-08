@@ -71,6 +71,12 @@ const approvalRequests = of("approval.request");
 const approvalDecisions = of("approval.decision");
 check("each batch approved exactly once", oracle.batches.every((_, i) => approvalRequests.filter((r) => r.batch === `batch-${i + 1}`).length === 1),
   approvalRequests.map((r) => r.batch));
+check("batches requested in release order", approvalRequests.every((r, i) => r.batch === `batch-${i + 1}`),
+  approvalRequests.map((r) => r.batch));
+
+const greenCi = of("ci.result").filter((r) => r.status === "green" && r.version === "2.0.0");
+check("every service reached CI green at 2.0.0", oracle.services.every((s) => greenCi.some((r) => r.service === s)),
+  oracle.services.filter((s) => !greenCi.some((r) => r.service === s)));
 
 const canaryAt = (s) => effects.find((r) => r.service === s && r.stage === "canary")?.t;
 const approvedAt = (batch) => approvalDecisions.find((r) => r.batch === batch)?.t;
@@ -104,19 +110,29 @@ const data = note?.data ?? tryParse(note?.text);
 check("follow-up lists patched services correctly", sortEq(data?.patched, good), data?.patched);
 check("follow-up lists rolled-back services correctly", sortEq(data?.rolledBack, bad), data?.rolledBack);
 
+const readsBeforeNote = of("service.read").filter((r) => note && lastPromote && r.t >= lastPromote && r.t <= note.t);
+check("every service re-read after the last promotion", oracle.services.every((s) => readsBeforeNote.some((r) => r.service === s)),
+  oracle.services.filter((s) => !readsBeforeNote.some((r) => r.service === s)));
+
 function tryParse(t) { try { return JSON.parse(t); } catch { return null; } }
 
 const starts = of("run.start");
 const relaunches = Math.max(0, starts.length - 1);
 const faults = of("fault");
 check("run announced itself (POST /run/start)", starts.length >= 1, starts.length);
+const finishes = of("run.finish");
+check("run finished exactly once after the follow-up", finishes.length === 1 && note && finishes[0].t >= note.t, finishes.length);
 
 if (requireTrigger) {
   const callbacks = of("callback").filter((r) => r.status >= 200 && r.status < 300 && isTriggerWaitUrl(r.url));
-  check("CI finished via a Trigger wait token", callbacks.some((r) => r.event === "ci.finished"),
-    of("callback").filter((r) => r.event === "ci.finished").map((r) => r.url));
-  check("approval decided via a Trigger wait token", callbacks.some((r) => r.event === "approval.decided"),
-    of("callback").filter((r) => r.event === "approval.decided").map((r) => r.url));
+  const ciCallbacks = callbacks.filter((r) => r.event === "ci.finished");
+  const approvalCallbacks = callbacks.filter((r) => r.event === "approval.decided");
+  check("every CI request used a Trigger wait token", of("ci.request").every((r) => r.callback) &&
+    of("ci.result").every((r) => ciCallbacks.some((c) => c.runId === r.runId)), ciCallbacks.length);
+  check("every approval used a Trigger wait token", approvalRequests.every((r) => r.callback) &&
+    approvalDecisions.every((r) => approvalCallbacks.some((c) => c.approvalId === r.approvalId)), approvalCallbacks.length);
+  check("Trigger workflow did not poll CI or approvals", of("ci.poll").length === 0 && of("approval.poll").length === 0,
+    { ci: of("ci.poll").length, approvals: of("approval.poll").length });
 }
 
 const polls = { ci: of("ci.poll").length, approvals: of("approval.poll").length, metrics: of("metrics.read").length, services: of("service.read").length };

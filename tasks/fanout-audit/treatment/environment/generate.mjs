@@ -41,8 +41,12 @@ if (routeCount > NAMES.length) {
   throw new Error(`ROUTE_COUNT ${routeCount} > ${NAMES.length} name pool`);
 }
 
-const names = NAMES.slice(0, routeCount);
 const publicRoutes = new Set(["health", "openapi", "login", "signup", "stripe-webhook", "status"]);
+const publicCount = Math.min(publicRoutes.size, Math.max(1, Math.floor(routeCount / 4)));
+const names = [
+  ...NAMES.filter((n) => !publicRoutes.has(n)).slice(0, routeCount - publicCount),
+  ...NAMES.filter((n) => publicRoutes.has(n)).slice(0, publicCount),
+];
 const mustAuth = names.filter((n) => !publicRoutes.has(n));
 if (plantedCount > mustAuth.length) {
   throw new Error("PLANTED larger than authenticatable routes");
@@ -105,16 +109,41 @@ export function requireAuth(handler: Handler): Handler {
 `,
 );
 
+writeFileSync(
+  join(workspace, "src/security.ts"),
+  `import { requireAuth, type Handler } from "./auth.ts";
+
+export const secure = (handler: Handler): Handler => requireAuth(handler);
+`,
+);
+
 function routeSource(name) {
   const isPublic = publicRoutes.has(name);
   const missingAuth = plantedSet.has(name);
   const body = `(_req) => ({ ok: true, resource: "${name}" })`;
 
-  if (isPublic || missingAuth) {
+  if (isPublic) {
     return `import type { Handler } from "../auth.ts";
 
 export const path = "/${name}";
 export const handler: Handler = ${body};
+`;
+  }
+
+  if (missingAuth) {
+    return `import type { Handler } from "../auth.ts";
+
+// requireAuth is intentionally absent here; comments are not enforcement.
+export const path = "/${name}";
+export const handler: Handler = ${body};
+`;
+  }
+
+  if (names.indexOf(name) % 2) {
+    return `import { secure } from "../security.ts";
+
+export const path = "/${name}";
+export const handler = secure(${body});
 `;
   }
 
@@ -147,20 +176,9 @@ for (const name of names) {
 writeFileSync(
   join(workspace, "scripts/ci.sh"),
   `#!/usr/bin/env bash
-# Fake CI. First run fails after CI_SECONDS; second run passes.
+# Tracker-backed CI. The first run fails; the second passes.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MARKER="$ROOT/.ci-attempt"
-SECONDS_WAIT="\${CI_SECONDS:-12}"
-echo "ci: running typecheck + integration (wait \${SECONDS_WAIT}s)"
-sleep "\$SECONDS_WAIT"
-if [[ ! -f "\$MARKER" ]]; then
-  touch "\$MARKER"
-  echo "ci: flaky integration failed (attempt 1)"
-  exit 1
-fi
-echo "ci: ok"
-exit 0
+curl -fsS -X POST "\${TRACKER_URL:?TRACKER_URL is required}/ci/run"
 `,
 );
 chmodSync(join(workspace, "scripts/ci.sh"), 0o755);
@@ -169,12 +187,12 @@ writeFileSync(
   join(workspace, "README.md"),
   `# acme-api
 
-Internal HTTP API. Authenticated routes must wrap handlers in \`requireAuth\`.
+Internal HTTP API. Authenticated routes must enforce \`requireAuth\` directly or through \`secure\`.
 Public exceptions: health, status, openapi, login, signup, stripe-webhook.
 `,
 );
 
-writeFileSync(join(workspace, ".gitignore"), "node_modules\n.ci-attempt\n");
+writeFileSync(join(workspace, ".gitignore"), "node_modules\n");
 
 if (process.env.ORACLE_OUT) {
   mkdirSync(dirname(process.env.ORACLE_OUT), { recursive: true });

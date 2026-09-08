@@ -18,9 +18,9 @@ Two Harbor packages, one world, one ledger:
 
 - Work the agent must accomplish: migrate 12 services off a vulnerable library, pass real CI, wait for delayed per-batch approvals, canary, roll back services that degrade, promote the rest, then post one follow-up after a delay.
 - Capability being tested:
-  - Control: unattended session-bound orchestration. The agent stays in `main` and drives the world itself.
-  - Treatment: Claude writes a Trigger.dev workflow. Waits must be `wait.forToken` / `wait.for` / `wait.until`, not an in-session poll loop.
-- Why this case matters: Scenario 5. Same world and grader; only the orchestrator changes.
+  - Control: Claude in ultracode mode authors and runs a native dynamic `Workflow`; the session remains the runtime for waits and side effects.
+  - Treatment: the same Claude setup authors and runs a Trigger.dev dynamic workflow. Waits must be `wait.forToken` / `wait.for` / `wait.until`, not an in-session poll loop.
+- Why this case matters: Scenario 5's no-fault long-wait baseline. Same world and grader; only the orchestrator changes.
 - Repository, trace, existing Task, or human evidence: naive reference `control/solution/reference-naive.mjs` passed Harbor Oracle on this world; sidecar `treatment/environment/trigger-dev`; world logs `callback.url`.
 - Difference from existing Tasks: one family with two Harbor packages.
 
@@ -34,10 +34,11 @@ Two Harbor packages, one world, one ledger:
 
 ## Relevant agent conditions
 
-- Control: long idle waits in-process. The session must stay alive until the train finishes.
+- Both arms use the same resolved Claude author model, ultracode effort, tool configuration, and authoring budget.
+- Control: a native `Workflow` must perform the service migration/verification decomposition; long waits remain in-process. A retained trajectory without that substantive Workflow call is an invalid arm assignment.
 - Treatment: author Trigger tasks, start one run, then idle. Harbor grades when the agent exits, so `main` must outlast the workflow even though the worker does the waits. Seeded `trigger.config.ts` disables default retries (`enabledInDev: false`) because a parent retry after `/run/start` is a relaunch.
 - Tools: HTTP to `world:4747`; filesystem under `/app`. Treatment also uses the sidecar worker and Trigger Cloud.
-- Material differences from normal operation: default `PROFILE=smoke`. `PROFILE=compressed` / `real` need a larger `[agent].timeout_sec`. Default Harbor does not SIGKILL `main`.
+- Material differences from normal operation: default `PROFILE=smoke`. `PROFILE=compressed` / `real` need a larger `[agent].timeout_sec`. Default Harbor does not SIGKILL `main`, so this package alone makes no crash-recovery claim.
 - Credentials: none on control. Treatment needs `TRIGGER_SECRET_KEY` (`tr_dev_…`), `TRIGGER_ACCESS_TOKEN` (`tr_pat_…` for `trigger dev`), and `TRIGGER_PROJECT_REF` from operator `.env`. Do not set `TRIGGER_ACCESS_TOKEN` to the project secret. `VERIFIER_TOKEN` is verifier-only.
 
 ## Environment
@@ -47,7 +48,7 @@ Shared:
 - 12 services pinned to acme-utils 1.4.2; batches in `RELEASE.md`; hidden degrade/flaky lists in the world image and each package's `tests/fixtures/oracle.json`.
 - Agent-visible: `/app/**`, `GET /windows`, documented world APIs.
 - Hidden: oracle, ledger, `/internal/ledger`, this `Task.md`, `tests/`, `solution/`.
-- Simulated world; CI runs `check.mjs` on the shared `workspace` volume.
+- Simulated world; CI runs a protected test runner from the world image under Node filesystem permissions and verifies the 2.0 vendor hash. Agent-editable `check.mjs` is only a local development aid.
 - Wall clock; compose DNS; 2 CPU / 4 GiB; fresh stack per trial; healthcheck `GET /health`.
 - World Skill: `.agents/skills/evals-world/SKILL.md` (unreviewed).
 - Production differences: compressed timings; world is one process.
@@ -67,34 +68,37 @@ Both arms, from the world ledger:
 | rollback_degraded | degraded rolled back once, never promoted | ledger + oracle | count rollback/promote | rollback==1, promote==0 |
 | idempotency | every deploy effect has idempotencyKey | ledger | field present | all true |
 | gates | each batch approved once; canary after approval | ledger timestamps | request count and order | exact |
+| ci | every service CI-green at 2.0.0 | protected runner + ledger | final successful CI result per service | exact |
 | rollback_latency | rollback soon after errorRate crosses 5% | ledger + windows.degradeAfter | seconds vs tolerance | within bound |
 | follow_up | one `#releases` notify after followUp of last promote, correct lists | ledger notify + oracle | count, delta, patched/rolledBack sets | exact |
 | autonomy | exactly one `/run/start` | ledger | count | == 1 |
+| finish | every service re-read; exactly one `/run/finish` after follow-up | ledger | reads and event order | exact |
 
 Treatment only (`grade.mjs --require-trigger`):
 
 | ID | Required or prohibited result | Independent evidence | Exact check or bounded semantic question | Pass condition |
 |---|---|---|---|---|
-| trigger_ci | at least one CI completion via Trigger | ledger `callback` | `event=ci.finished`, HTTP 2xx, hostname `*.trigger.dev` | >= 1 |
-| trigger_approval | at least one approval via Trigger | ledger `callback` | `event=approval.decided`, HTTP 2xx, hostname `*.trigger.dev` | >= 1 |
+| trigger_ci | every CI completion resumes a Trigger wait | ledger `callback` | matching run id, HTTP 2xx, hostname `*.trigger.dev` | all CI results |
+| trigger_approval | every approval resumes a Trigger wait | ledger `callback` | matching approval id, HTTP 2xx, hostname `*.trigger.dev` | all approvals |
+| no_polling | no CI or approval polling | ledger | poll counts | zero |
 
-- Control accepted alternatives: any in-session orchestrator. Trigger is not provided.
+- Control accepted alternatives: any native Workflow decomposition for migration and verification, with session-local wait/deploy logic. Trigger is not provided.
 - Treatment accepted alternatives: any Trigger task graph that uses wait tokens for CI and approvals. A polling loop that finishes the ledger still fails the Trigger rows.
 - Complete pass rule: listed rows for that arm AND relaunches == 0. Reward 1 or 0.
-- Invalid-run conditions: world unhealthy; ledger fetch failure; treatment missing Trigger keys if the sidecar never attached (infra).
+- Invalid-run conditions: world unhealthy; protected CI or ledger unavailable; missing substantive Workflow use in control; treatment missing Trigger keys; mismatched author model, effort, tools, or budget.
 
 ## Fairness and leakage
 
 - Why the Task is solvable: control Oracle `reference-naive.mjs` passes `PROFILE=smoke`. Treatment uses the same world plus a seeded Trigger project and keys.
 - How required information is visible: `RELEASE.md`, `MIGRATION.md`, `/windows`, metrics during canary. Treatment also sees `/app/orchestrator` and Trigger env vars.
-- Likely shortcuts: read `/hidden` on world; call `/internal/ledger` without the verifier token; edit tests. Treatment: ignore Trigger and poll (fails `--require-trigger`); fake `arm: trigger`; `trigger deploy`.
+- Likely shortcuts: edit agent-visible `check.mjs`; call `/internal/ledger`; ignore Trigger and poll; fake `arm: trigger`; `trigger deploy`. Protected CI ignores editable tests and cannot read the hidden oracle.
 - Hidden truth stays off `main`: oracle and ledger on the world image; `tests/` uploaded after the agent; this `Task.md` is outside both Harbor build contexts.
 - Realistic wrong result: promote a degraded service; skip follow-up; treatment ledger-perfect poll loop.
-- Prohibited collateral: extra `#releases` notifies; deploy without idempotencyKey.
+- Prohibited collateral: modifying the vendored 2.0 library; extra `#releases` notifies; deploy without idempotencyKey.
 
 ## Open decisions
 
-- Human decisions: Draft. Layout `control/` + `treatment/` with family spec at this root.
-- Run plan: `harbor run -p tasks/release-train/control -a oracle -e docker -n 1`. Treatment: `harbor run -p tasks/release-train/treatment -a oracle --env-file .env -e docker -n 1`. Model trials not authorized.
+- Human decisions: Draft. Audit fixes implemented; changed scoring and protected CI behavior await review.
+- Run plan: `harbor run -p tasks/release-train/control -a oracle -e docker -n 1`. Treatment: `harbor run -p tasks/release-train/treatment -a oracle --env-file .env -e docker -n 1`. Updated control Oracle passed (`jobs/fixed-release-control-oracle`). Model trials not authorized.
 - Assumptions: Harbor grades when the agent exits; `world` hostname works; treatment `world` has egress to `api.trigger.dev`.
-- Remaining questions: Trigger reference `solve.sh`; whether Harbor should wait on world completion instead of agent exit; whether `PROFILE=compressed` should be the default scored timeout.
+- Remaining questions: add a separately specified orchestrator-kill variant with an automatic resume policy; whether `PROFILE=compressed` should be the default scored timeout.

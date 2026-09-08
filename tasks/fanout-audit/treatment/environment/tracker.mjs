@@ -7,10 +7,13 @@ const ledgerPath = process.env.LEDGER_PATH ?? "/hidden/ledger.jsonl";
 const port = Number(process.env.TRACKER_PORT ?? 9410);
 const bind = process.env.BIND ?? "0.0.0.0";
 const verifierToken = process.env.VERIFIER_TOKEN ?? "";
+const ciSeconds = Number(process.env.CI_SECONDS ?? 12);
 let seq = 0;
+let ciAttempts = 0;
 
 mkdirSync(dirname(ledgerPath), { recursive: true });
 writeFileSync(ledgerPath, "");
+appendFileSync(ledgerPath, JSON.stringify({ kind: "tracker.start", at: new Date().toISOString() }) + "\n");
 
 function rows() {
   if (!existsSync(ledgerPath)) return [];
@@ -54,6 +57,7 @@ const server = createServer((req, res) => {
       }
       seq += 1;
       const record = {
+        kind: "ticket",
         id: `tkt_${seq}`,
         at: new Date().toISOString(),
         route: payload.route ?? null,
@@ -64,6 +68,21 @@ const server = createServer((req, res) => {
       appendFileSync(ledgerPath, JSON.stringify(record) + "\n");
       json(201, record);
     });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/ci/run") {
+    ciAttempts += 1;
+    const attempt = ciAttempts;
+    setTimeout(() => {
+      const status = attempt === 1 ? "failed" : "green";
+      const record = { kind: "ci", at: new Date().toISOString(), attempt, status };
+      appendFileSync(ledgerPath, JSON.stringify(record) + "\n");
+      json(status === "green" ? 200 : 503, {
+        status,
+        detail: status === "green" ? "typecheck and integration passed" : "infra: flaky integration runner",
+      });
+    }, ciSeconds * 1000);
     return;
   }
 
