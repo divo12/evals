@@ -2,6 +2,8 @@
 
 Harbor tasks for durable-agent and long-horizon coding evals (Trigger.dev Scenario 5).
 
+Latest comparison: [`results/release-train.md`](results/release-train.md).
+
 Layout matches [ITSMBench](https://github.com/new-measure/ITSMBench) and the Harbor 0.22 task format. Each family (`release-train`, `fanout-audit`) keeps human `Task.md` / `README.md` at the family root; Harbor packages live in `control/` and `treatment/`.
 
 ## Prerequisites

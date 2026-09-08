@@ -118,9 +118,9 @@ Treatment only (`grade.mjs --require-trigger`):
   callbacks and zero CI/approval polls.
 - Codex control: `jobs/codex-release-train-control-20260908T101855Z`, reward
   1, no exception, 826s total. The skill created workflow artifacts and three
-  native batch-migration subagents. World ledger span: 594s. Harbor reported
-  only its most recent rollout's $0.1725632 cost, so control's aggregate token
-  and cost metrics are incomplete.
+  native batch-migration subagents. Reconstructed aggregate usage was 1,212,121
+  input / 1,120,512 cached / 17,490 output tokens and $1.1644408. World ledger
+  span: 594s.
 - Fire-and-exit Codex treatment: `jobs/release-treatment-helper-codex`, reward
   1, no exception, 930s total. Codex authored and handed off in 533s; the
   verifier waited 307s with no model active. Usage was 467,034 input / 416,768
@@ -136,5 +136,4 @@ Treatment only (`grade.mjs --require-trigger`):
   `jobs/release-treatment-fire-exit-codex` hit an experimental 600s authoring
   cutoff before handoff. None is scored.
 - One trial per arm establishes reachability, not a stable performance ranking.
-  Cost is not comparable until control is rerun with valid unredacted parent
-  and subagent artifacts and summarized across all sessions.
+  The aggregate table is in `results/release-train.md`.
